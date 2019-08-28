@@ -12,6 +12,7 @@ package org.openmrs.module.patientqueueing.api.dao;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.hibernate.Criteria;
+import org.hibernate.SQLQuery;
 import org.hibernate.criterion.Restrictions;
 import org.openmrs.Location;
 import org.openmrs.Patient;
@@ -66,4 +67,12 @@ public class PatientQueueingDao {
 		criteria.add(Restrictions.eq("locationTo", sessionLocation));
 		return criteria.list();
 	}
+	
+	public List<PatientQueue> searchQueue(String query) {
+		SQLQuery sqlQuery = getSession().createSQLQuery(query);
+		sqlQuery.addEntity(PatientQueue.class);
+		List<PatientQueue> patientQueueList = sqlQuery.list();
+		return patientQueueList;
+	}
+	
 }

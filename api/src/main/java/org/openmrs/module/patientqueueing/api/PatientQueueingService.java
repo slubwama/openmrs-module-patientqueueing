@@ -46,4 +46,8 @@ public interface PatientQueueingService extends OpenmrsService {
 	
 	@Transactional
 	public abstract PatientQueue completeQueue(PatientQueue patientQueue) throws APIException;
+	
+	@Transactional
+	public List<PatientQueue> searchQueue(String searchString, String fromDate, String toDate, Provider provider,
+	        Location sessionLocation) throws APIException;
 }

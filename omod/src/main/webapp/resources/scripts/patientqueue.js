@@ -27,7 +27,7 @@ patientqueue.createCompletePatientQueueDialog = function () {
         selector: '#complete_patient_queue',
         actions: {
             confirm: function () {
-                emr.getFragmentActionWithCallback('patientqueueing', 'completePatientQueue', 'post', visit.buildVisitTypeAttributeParams(),
+                emr.getFragmentActionWithCallback('patientqueueing', 'completePatientQueue', 'completeQueue', visit.buildVisitTypeAttributeParams(),
                     function (v) {
                         jq('#complete_patient_queue' + ' .icon-spin').css('display', 'inline-block').parent().addClass('disabled');
                         patientqueue.goToReturnUrl(patientqueue.patientId, v);
@@ -134,14 +134,5 @@ patientqueue.closeReadMessageDialog = function () {
 patientqueue.buildAlertAttributeParams = function () {
     var params = {};
     params['alert_message_id'] = patientqueue.alert_message_id;
-    return params;
-}
-
-
-
-patientqueue.buildVisitTypeAttributeParams = function (patientId, patientQueueId) {
-    var params = {};
-    params['patientId'] = patientqueue.patientId;
-    params['patientQueueId'] = patientqueue.patientQueueId
     return params;
 }

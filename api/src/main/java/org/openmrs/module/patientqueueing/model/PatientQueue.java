@@ -1,36 +1,46 @@
 package org.openmrs.module.patientqueueing.model;
 
+import com.fasterxml.jackson.annotation.JsonIdentityInfo;
+import com.fasterxml.jackson.annotation.ObjectIdGenerators;
+import org.codehaus.jackson.annotate.JsonBackReference;
 import org.openmrs.*;
 
 import javax.persistence.*;
+import java.io.Serializable;
 
 @Entity(name = "patientqueueing.PatientQueue")
 @Table(name = "patient_queue")
-public class PatientQueue extends BaseOpenmrsData {
+public class PatientQueue extends BaseOpenmrsData implements Serializable {
 	
 	@Id
 	@GeneratedValue
 	@Column(name = "patient_queue_id")
+	@JsonBackReference
 	private Integer patientQueueId;
 	
 	@ManyToOne
 	@JoinColumn(name = "patient_id")
+	@JsonBackReference
 	private Patient patient;
 	
 	@ManyToOne
 	@JoinColumn(name = "provider_id")
+	@JsonBackReference
 	private Provider provider;
 	
 	@ManyToOne
 	@JoinColumn(name = "location_from")
+	@JsonBackReference
 	private Location locationFrom;
 	
 	@ManyToOne
 	@JoinColumn(name = "location_to")
+	@JsonBackReference
 	private Location locationTo;
 	
 	@ManyToOne
 	@JoinColumn(name = "encounter_id")
+	@JsonBackReference
 	private Encounter encounter;
 	
 	@Column(name = "status", length = 255)
@@ -93,5 +103,15 @@ public class PatientQueue extends BaseOpenmrsData {
 	
 	public void setStatus(String status) {
 		this.status = status;
+	}
+	
+	@Override
+	public User getCreator() {
+		return creator;
+	}
+	
+	@Override
+	public void setCreator(User creator) {
+		this.creator = creator;
 	}
 }
