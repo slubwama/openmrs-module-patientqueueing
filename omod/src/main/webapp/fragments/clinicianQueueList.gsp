@@ -68,7 +68,7 @@
     }
 </script>
 
-<div class="info-section">
+<div class="info-section" id="clinician-list">
     <div class="info-header">
         <i class="icon-diagnosis"></i>
 

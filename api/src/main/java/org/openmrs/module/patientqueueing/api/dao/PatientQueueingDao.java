@@ -63,7 +63,10 @@ public class PatientQueueingDao {
 	public List<PatientQueue> getPatientInQueue(Provider provider, Date fromDate, Date toDate, Location sessionLocation) {
 		Criteria criteria = getSession().createCriteria(PatientQueue.class);
 		criteria.add(Restrictions.between("dateCreated", fromDate, toDate));
-		criteria.add(Restrictions.eq("provider", provider));
+		
+		if (provider != null) {
+			criteria.add(Restrictions.eq("provider", provider));
+		}
 		criteria.add(Restrictions.eq("locationTo", sessionLocation));
 		return criteria.list();
 	}

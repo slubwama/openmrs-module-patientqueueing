@@ -6,6 +6,7 @@ patientqueue.readMessageDialog = null;
 patientqueue.alert_message_id=null;
 patientqueue.message=null;
 patientqueue.patientId=null;
+patientqueue.orderId=null;
 patientqueue.createMessageDialog=null;
 
 
@@ -135,4 +136,35 @@ patientqueue.buildAlertAttributeParams = function () {
     var params = {};
     params['alert_message_id'] = patientqueue.alert_message_id;
     return params;
+};
+
+patientqueue.showAddOrderToLabWorkLIstDialog = function (orderId) {
+    patientqueue.orderId = orderId;
+    if (patientqueue.addOrderWorkListDialog == null) {
+        patientqueue.createAddOrderToLabWorkListDialog();
+    }
+    jq("#order_id").val(patientqueue.orderId);
+    jq("#sample_id").val("");
+    jq("#reference_lab").prop('selectedIndex',0);
+    jq("#specimen_source_id").prop('selectedIndex',0);
+    jq("#refer_test input[type=checkbox]").prop('checked',false);
+    patientqueue.addOrderWorkListDialog.show();
+};
+
+patientqueue.closeAddOrderToWorkDialog = function () {
+    patientqueue.addOrderWorkListDialog.close();
+};
+
+
+patientqueue.createAddOrderToLabWorkListDialog = function () {
+    patientqueue.addOrderWorkListDialog = emr.setupConfirmationDialog({
+        selector: '#add-order-to-lab-worklist-dialog',
+        actions: {
+            cancel: function () {
+                patientqueue.addOrderWorkListDialog.close();
+            }
+        }
+    });
+
+    patientqueue.addOrderWorkListDialog.close();
 }

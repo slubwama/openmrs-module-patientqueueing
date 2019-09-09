@@ -74,6 +74,7 @@ public class ClinicianDashboardPageController {
 		
 		model.addAttribute("baseDashboardUrl", coreAppsProperties.getDashboardUrl()); // used for breadcrumbs to link back to the base dashboard in the case when this is used to render a context-specific dashboard
 		model.addAttribute("dashboard", dashboard);
+		model.put("currentLocation", sessionContext.getSessionLocation());
 		return null;
 	}
 	
