@@ -28,7 +28,7 @@ public class ClinicianQueueListFragmentController {
 	}
 	
 	public void controller(@SpringBean FragmentModel pageModel, UiSessionContext uiSessionContext) {
-		
+		pageModel.put("clinicianLocation", "Clinician Location");
 	}
 	
 	public SimpleObject getPatientQueueList(@RequestParam(value = "searchfilter", required = false) String searchfilter,

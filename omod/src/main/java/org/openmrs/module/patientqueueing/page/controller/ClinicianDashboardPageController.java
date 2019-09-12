@@ -44,7 +44,6 @@ public class ClinicianDashboardPageController {
 		if (StringUtils.isEmpty(dashboard)) {
 			dashboard = "clinicianDashboard";
 		}
-		
 		model.addAttribute("app", app);
 		UiUtils uiUtils = new BasicUiUtils();
 		

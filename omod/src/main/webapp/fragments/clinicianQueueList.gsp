@@ -1,5 +1,6 @@
+<% if (currentLocation == clinicianLocation) { %>
 <%
-    ui.includeCss("coreapps", "patientsearch/patientSearchWidget.css")
+        ui.includeCss("coreapps", "patientsearch/patientSearchWidget.css")
 %>
 <script>
 
@@ -12,6 +13,22 @@
                     getPatientQueue();
                 }
             });
+
+            jq('#exampleModal').on('show.bs.modal', function (event) {
+                var button = jq(event.relatedTarget) // Button that triggered the modal
+                var recipient = button.data('whatever') // Extract info from data-* attributes
+                var order_id = button.data('order_id') // Extract info from data-* attributes
+                jq("#order_id").val(order_id);
+                jq("#sample_id").val("");
+                jq("#reference_lab").prop('selectedIndex', 0);
+                jq("#specimen_source_id").prop('selectedIndex', 0);
+                jq("#refer_test input[type=checkbox]").prop('checked', false);
+                // If necessary, you could initiate an AJAX request here (and then do the updating in a callback).
+                // Update the modal's content. We'll use jQuery here, but you could use a data binding library or other methods instead.
+                var modal = jq(this)
+                modal.find('.modal-title').text('New message to ' + order_id)
+                modal.find('.modal-body input').val(order_id)
+            })
         });
     }
 
@@ -58,6 +75,7 @@
             content += "<td>";
             content += "<i class=\"icon-dashboard view-action\" title=\"Goto Patient's Dashboard\" onclick=\"location.href = 'urlToPatientDashboard'\"></i>".replace("urlToPatientDashboard", urlToPatientDashBoard);
             content += "<i class=\"icon-exchange edit-action\" title=\"Transfer To Another Provider\" onclick='urlTransferPatientToAnotherQueue'></i>".replace("urlTransferPatientToAnotherQueue", urlTransferPatientToAnotherQueue);
+            content += "<i class=\"icon-exchange edit-action\" data-toggle=\"modal\" data-target=\"#add_patient_to_queue_dialog\" data-id=\"\" data-whatever=\"@mdo\" data-order_id=\"%s\"></i>".replace("%s", patientQueueListElement.patientId);
             content += "<i class=\"icon-envelope view-action\" title=\"Transfer To Another Provider\" onclick='urlAlert'><span style=\"color: red\">1</span></i>".replace("urlAlert", urlAlert);
             content += "</td>";
             content += "</tr>";
@@ -88,3 +106,4 @@
         </div>
     </div>
 </div>
+<% } %>

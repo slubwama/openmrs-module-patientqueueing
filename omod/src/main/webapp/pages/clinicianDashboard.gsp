@@ -22,16 +22,20 @@ ${ui.includeFragment(it.extensionParams.provider, it.extensionParams.fragment, c
 <% }
 } %>
 
-
-<div class="container">
-    <div class="dashboard clear">
-        <!-- only show the title div if a title has been defined in the messages.properties -->
-        <% if (ui.message(dashboard + ".custom.title") != dashboard + ".custom.title") { %>
-        <div class="title">
-            <h3>${ui.message(dashboard + ".custom.title")}</h3>
+<div class="dashboard clear">
+    <div class="row">
+        <div  class="col-12">
+            <!-- only show the title div if a title has been defined in the messages.properties -->
+            <% if (ui.message(dashboard + ".custom.title") != dashboard + ".custom.title") { %>
+            <div class="title">
+                <h3>${ui.message(dashboard + ".custom.title")}</h3>
+            </div>
+            <% } %>
         </div>
-        <% } %>
-        <div id="right-column" class="info-container column" style="min-width: 70%">
+    </div>
+
+    <div class="row">
+        <div id="right-column" class="col-9">
             <% if (rightColumnFragments) {
                 rightColumnFragments.each {
                     // create a base map from the fragmentConfig if it exists, otherwise just create an empty map
@@ -46,7 +50,7 @@ ${ui.includeFragment(it.extensionParams.provider, it.extensionParams.fragment, c
 
         </div>
 
-        <div id="left-column" class="info-container column">
+        <div id="left-column" class="col-3">
             <% if (leftColumnFragments) {
                 leftColumnFragments.each {
                     // create a base map from the fragmentConfig if it exists, otherwise just create an empty map
