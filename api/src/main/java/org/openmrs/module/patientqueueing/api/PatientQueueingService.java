@@ -18,6 +18,8 @@ import org.openmrs.api.OpenmrsService;
 import org.openmrs.module.patientqueueing.model.PatientQueue;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.io.IOException;
+import java.text.ParseException;
 import java.util.Date;
 import java.util.List;
 
@@ -50,4 +52,9 @@ public interface PatientQueueingService extends OpenmrsService {
 	@Transactional
 	public List<PatientQueue> searchQueue(String searchString, String fromDate, String toDate, Provider provider,
 	        Location sessionLocation) throws APIException;
+	
+	@Transactional
+	public PatientQueue getPatientQueueByQueueNumber(String queueNumber) throws APIException;
+	
+	public String generateQueueNumber(Location location) throws ParseException, IOException;
 }

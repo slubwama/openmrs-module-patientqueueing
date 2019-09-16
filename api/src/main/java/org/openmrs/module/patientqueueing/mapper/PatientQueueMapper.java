@@ -1,6 +1,5 @@
 package org.openmrs.module.patientqueueing.mapper;
 
-import javax.persistence.Column;
 import java.io.Serializable;
 
 public class PatientQueueMapper implements Serializable {
@@ -28,15 +27,14 @@ public class PatientQueueMapper implements Serializable {
 	private String creatorId;
 	
 	private String creatorNames;
-
-    private String queueNumber;
-
-    private Integer priority;
-
-    private String priorityComment;
-
-
-    public PatientQueueMapper() {
+	
+	private String queueNumber;
+	
+	private Integer priority;
+	
+	private String priorityComment;
+	
+	public PatientQueueMapper() {
 	}
 	
 	public Integer getPatientQueueId() {
@@ -142,28 +140,28 @@ public class PatientQueueMapper implements Serializable {
 	public void setGender(String gender) {
 		this.gender = gender;
 	}
-
-    public String getQueueNumber() {
-        return queueNumber;
-    }
-
-    public void setQueueNumber(String queueNumber) {
-        this.queueNumber = queueNumber;
-    }
-
-    public Integer getPriority() {
-        return priority;
-    }
-
-    public void setPriority(Integer priority) {
-        this.priority = priority;
-    }
-
-    public String getPriorityComment() {
-        return priorityComment;
-    }
-
-    public void setPriorityComment(String priorityComment) {
-        this.priorityComment = priorityComment;
-    }
+	
+	public String getQueueNumber() {
+		return queueNumber;
+	}
+	
+	public void setQueueNumber(String queueNumber) {
+		this.queueNumber = queueNumber;
+	}
+	
+	public Integer getPriority() {
+		return priority;
+	}
+	
+	public void setPriority(Integer priority) {
+		this.priority = priority;
+	}
+	
+	public String getPriorityComment() {
+		return priorityComment;
+	}
+	
+	public void setPriorityComment(String priorityComment) {
+		this.priorityComment = priorityComment;
+	}
 }

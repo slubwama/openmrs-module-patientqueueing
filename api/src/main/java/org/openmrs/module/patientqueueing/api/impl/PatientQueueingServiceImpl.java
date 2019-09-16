@@ -20,6 +20,9 @@ import org.openmrs.module.patientqueueing.api.PatientQueueingService;
 import org.openmrs.module.patientqueueing.api.dao.PatientQueueingDao;
 import org.openmrs.module.patientqueueing.model.PatientQueue;
 
+import java.io.IOException;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
@@ -90,6 +93,11 @@ public class PatientQueueingServiceImpl extends BaseOpenmrsService implements Pa
 		return dao.searchQueue(query);
 	}
 	
+	@Override
+	public PatientQueue getPatientQueueByQueueNumber(String queueNumber) throws APIException {
+		return dao.getPatientQueueByQueueNumber(queueNumber);
+	}
+	
 	private String processSearchString(String searchString) {
 		PatientService patientService = Context.getPatientService();
 		
@@ -111,6 +119,40 @@ public class PatientQueueingServiceImpl extends BaseOpenmrsService implements Pa
 			s = patientIds.toString().replace("]", "").replace("[", "");
 		}
 		return s;
+	}
+	
+	/**
+	 * Generate Checkin ID
+	 * 
+	 * @param location
+	 * @return
+	 * @throws ParseException
+	 * @throws IOException
+	 */
+	public String generateQueueNumber(Location location) throws ParseException, IOException {
+		SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy");
+		String date = sdf.format(new Date());
+		String letter = location.getName();
+		if (letter.length() > 3) {
+			letter = letter.substring(0, 3);
+		}
+		String defaultQueueNumber = "";
+		int id = 0;
+		do {
+			++id;
+			defaultQueueNumber = date + "-" + letter + "-" + id;
+		} while (isQueueNumberIdExisting(defaultQueueNumber));
+		
+		return defaultQueueNumber;
+	}
+	
+	public boolean isQueueNumberIdExisting(String queueNumber) throws ParseException {
+		PatientQueue patientQueue = getPatientQueueByQueueNumber(queueNumber);
+		if (patientQueue != null) {
+			return true;
+		} else {
+			return false;
+		}
 	}
 	
 }
