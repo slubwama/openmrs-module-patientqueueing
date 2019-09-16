@@ -17,7 +17,7 @@ import org.openmrs.module.BaseModuleActivator;
  * This class contains the logic that is run every time this module is either started or shutdown
  */
 public class PatientQueueingActivator extends BaseModuleActivator {
-
+	
 	private static final Log log = LogFactory.getLog(PatientQueueingActivator.class);
 	
 	/**

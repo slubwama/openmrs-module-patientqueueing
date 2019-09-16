@@ -140,7 +140,7 @@ public class PatientQueueingServiceImpl extends BaseOpenmrsService implements Pa
 		int id = 0;
 		do {
 			++id;
-			defaultQueueNumber = date + "-" + letter + "-" + id;
+			defaultQueueNumber = date + "-" + letter + "-" + "00" + id;
 		} while (isQueueNumberIdExisting(defaultQueueNumber));
 		
 		return defaultQueueNumber;
