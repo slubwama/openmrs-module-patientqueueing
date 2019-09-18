@@ -43,6 +43,9 @@ public interface PatientQueueingService extends OpenmrsService {
 	public abstract List<PatientQueue> getPatientInQueueList(Date fromDate, Date toDate, Location sessionLocation)
 	        throws APIException;
 	
+	public List<PatientQueue> getPatientInQueueList(Provider provider, Date fromDate, Date toDate, Location sessionLocation,
+	        Patient patient, String status) throws APIException;
+	
 	@Transactional
 	public abstract PatientQueue savePatientQue(PatientQueue patientQueue) throws APIException;
 	

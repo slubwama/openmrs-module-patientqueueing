@@ -28,6 +28,8 @@ import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
 
+import static org.openmrs.module.patientqueueing.PatientQueueingConfig.QUEUE_STATUS_COMPLETED;
+
 public class PatientQueueingServiceImpl extends BaseOpenmrsService implements PatientQueueingService {
 	
 	PatientQueueingDao dao;
@@ -49,6 +51,11 @@ public class PatientQueueingServiceImpl extends BaseOpenmrsService implements Pa
 		return dao.getPatientInQueue(provider, fromDate, toDate, sessionLocation);
 	}
 	
+	public List<PatientQueue> getPatientInQueueList(Provider provider, Date fromDate, Date toDate, Location sessionLocation,
+	        Patient patient, String status) throws APIException {
+		return dao.getPatientInQueue(provider, fromDate, toDate, sessionLocation, patient, status);
+	}
+	
 	@Override
 	public List<PatientQueue> getPatientInQueueList(Date fromDate, Date toDate, Location sessionLocation)
 	        throws APIException {
@@ -61,7 +68,8 @@ public class PatientQueueingServiceImpl extends BaseOpenmrsService implements Pa
 	
 	@Override
 	public PatientQueue completeQueue(PatientQueue patientQueue) throws APIException {
-		return null;
+		patientQueue.setStatus(QUEUE_STATUS_COMPLETED);
+		return dao.savePatientQueue(patientQueue);
 	}
 	
 	@Override

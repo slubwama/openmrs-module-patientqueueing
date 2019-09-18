@@ -28,7 +28,15 @@ public class ClinicianQueueListFragmentController {
 	}
 	
 	public void controller(@SpringBean FragmentModel pageModel, UiSessionContext uiSessionContext) {
-		pageModel.put("clinicianLocation", "Clinician Location");
+		SimpleObject simpleObject = new SimpleObject();
+		
+		List<String> list = new ArrayList();
+		list.add("86863db4-6101-4ecf-9a86-5e716d6504e4");
+		list.add("11d5d2b8-0fdd-42e0-9f53-257c760bb9a3");
+		list.add("e9bc61b5-69ff-414b-9cf0-0c22d6dfca2b");
+		list.add("8f96e239-8586-4ec6-9375-04c6e19628ae");
+		list.add("8ab22b55-9a17-4121-bf08-6134a9a2439f");
+		pageModel.put("clinicianLocation", list);
 	}
 	
 	public SimpleObject getPatientQueueList(@RequestParam(value = "searchfilter", required = false) String searchfilter,
@@ -43,15 +51,14 @@ public class ClinicianQueueListFragmentController {
 			try {
 				patientQueueList = patientQueueingService.searchQueue(searchfilter,
 				    QueueingUtil.dateFormtterString(new Date(), "00:00:00"),
-				    QueueingUtil.dateFormtterString(new Date(), "23:59:59"), uiSessionContext.getCurrentProvider(),
-				    uiSessionContext.getSessionLocation());
+				    QueueingUtil.dateFormtterString(new Date(), "23:59:59"), null, uiSessionContext.getSessionLocation());
 			}
 			catch (ParseException e) {
 				log.error(e);
 			}
 		} else {
 			try {
-				patientQueueList = patientQueueingService.getPatientInQueueList(uiSessionContext.getCurrentProvider(),
+				patientQueueList = patientQueueingService.getPatientInQueueList(null,
 				    QueueingUtil.dateFormtterDate(new Date(), "00:00:00"),
 				    QueueingUtil.dateFormtterDate(new Date(), "23:59:59"), uiSessionContext.getSessionLocation());
 			}

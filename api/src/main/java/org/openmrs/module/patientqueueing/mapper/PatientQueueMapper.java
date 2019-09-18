@@ -28,6 +28,8 @@ public class PatientQueueMapper implements Serializable {
 	
 	private String creatorNames;
 	
+	private String encounterId;
+	
 	private String queueNumber;
 	
 	private Integer priority;
@@ -163,5 +165,13 @@ public class PatientQueueMapper implements Serializable {
 	
 	public void setPriorityComment(String priorityComment) {
 		this.priorityComment = priorityComment;
+	}
+	
+	public String getEncounterId() {
+		return encounterId;
+	}
+	
+	public void setEncounterId(String encounterId) {
+		this.encounterId = encounterId;
 	}
 }

@@ -13,6 +13,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.hibernate.Criteria;
 import org.hibernate.SQLQuery;
+import org.hibernate.criterion.Order;
 import org.hibernate.criterion.Restrictions;
 import org.openmrs.Location;
 import org.openmrs.Patient;
@@ -73,6 +74,34 @@ public class PatientQueueingDao {
 			criteria.add(Restrictions.eq("provider", provider));
 		}
 		criteria.add(Restrictions.eq("locationTo", sessionLocation));
+		return criteria.list();
+	}
+	
+	public List<PatientQueue> getPatientInQueue(Provider provider, Date fromDate, Date toDate, Location location,
+	        Patient patient, String status) {
+		Criteria criteria = getSession().createCriteria(PatientQueue.class);
+		if (fromDate != null && toDate != null) {
+			criteria.add(Restrictions.between("dateCreated", fromDate, toDate));
+		}
+		
+		if (provider != null) {
+			criteria.add(Restrictions.eq("provider", provider));
+		}
+		
+		if (location != null) {
+			criteria.add(Restrictions.eq("locationTo", location));
+		}
+		
+		if (patient != null) {
+			criteria.add(Restrictions.eq("patient", patient));
+		}
+		
+		if (status != null) {
+			criteria.add(Restrictions.eq("status", status));
+		}
+		
+		criteria.addOrder(Order.desc("dateCreated"));
+		
 		return criteria.list();
 	}
 	
