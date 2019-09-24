@@ -31,11 +31,8 @@ public class ClinicianQueueListFragmentController {
 		SimpleObject simpleObject = new SimpleObject();
 		
 		List<String> list = new ArrayList();
-		list.add("86863db4-6101-4ecf-9a86-5e716d6504e4");
-		list.add("11d5d2b8-0fdd-42e0-9f53-257c760bb9a3");
-		list.add("e9bc61b5-69ff-414b-9cf0-0c22d6dfca2b");
-		list.add("8f96e239-8586-4ec6-9375-04c6e19628ae");
-		list.add("8ab22b55-9a17-4121-bf08-6134a9a2439f");
+		list.add("NAN");
+		
 		pageModel.put("clinicianLocation", list);
 	}
 	
@@ -65,7 +62,6 @@ public class ClinicianQueueListFragmentController {
 			catch (ParseException e) {
 				log.error(e);
 			}
-			
 		}
 		
 		List<PatientQueueMapper> patientQueueMappers = mapPatientQueueToMapper(patientQueueList);

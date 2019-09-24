@@ -67,8 +67,8 @@ public class PatientQueueingServiceImpl extends BaseOpenmrsService implements Pa
 	}
 	
 	@Override
-	public PatientQueue completeQueue(PatientQueue patientQueue) throws APIException {
-		patientQueue.setStatus(QUEUE_STATUS_COMPLETED);
+	public PatientQueue completeQueue(PatientQueue patientQueue, String status) throws APIException {
+		patientQueue.setStatus(status);
 		return dao.savePatientQueue(patientQueue);
 	}
 	

@@ -24,6 +24,8 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+import static org.openmrs.module.patientqueueing.PatientQueueingConfig.QUEUE_STATUS_COMPLETED;
+
 /**
  * VisitIncludes fragment. Retrieve and set the visit type and attributes
  */
@@ -36,7 +38,7 @@ public class CompleteQueueFragmentController {
 	public SimpleObject completeQueue(FragmentModel model, @RequestParam("patientQueueId") PatientQueue patientQueue,
 	        UiUtils ui) throws IOException {
 		PatientQueueingService patientService = Context.getService(PatientQueueingService.class);
-		patientService.completeQueue(patientQueue);
+		patientService.completeQueue(patientQueue, QUEUE_STATUS_COMPLETED);
 		return null;
 	}
 }
