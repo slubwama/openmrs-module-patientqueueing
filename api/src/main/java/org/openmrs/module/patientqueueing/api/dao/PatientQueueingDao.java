@@ -46,6 +46,17 @@ public class PatientQueueingDao {
 		        .add(Restrictions.eq("patientQueueId", queueId)).uniqueResult();
 	}
 	
+	public List<PatientQueue> getPatientQueueByVisitNumber(String visitNumber) {
+		return (List<PatientQueue>) getSession().createCriteria(PatientQueue.class)
+		        .add(Restrictions.eq("visitNumber", visitNumber)).list();
+	}
+	
+	public List<PatientQueue> getPatientQueueByPatient(Patient patient) {
+		Criteria criteria = getSession().createCriteria(PatientQueue.class);
+		criteria.add(Restrictions.eq("patient", patient));
+		return criteria.list();
+	}
+	
 	/**
 	 * @see org.openmrs.module.patientqueueing.api.PatientQueueingService#getPatientQueueList(org.openmrs.Provider,
 	 *      java.util.Date, java.util.Date, org.openmrs.Location, org.openmrs.Location,
@@ -87,7 +98,7 @@ public class PatientQueueingDao {
 	/**
 	 * @see org.openmrs.module.patientqueueing.api.PatientQueueingService#savePatientQue(org.openmrs.module.patientqueueing.model.PatientQueue)
 	 */
-	public PatientQueue savePatientQueue(PatientQueue patientQueue) throws Exception {
+	public PatientQueue savePatientQueue(PatientQueue patientQueue) {
 		sessionFactory.getCurrentSession().saveOrUpdate(patientQueue);
 		return patientQueue;
 	}

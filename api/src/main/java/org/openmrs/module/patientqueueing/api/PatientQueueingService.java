@@ -17,6 +17,8 @@ import org.openmrs.api.OpenmrsService;
 import org.openmrs.module.patientqueueing.model.PatientQueue;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.io.IOException;
+import java.text.ParseException;
 import java.util.Date;
 import java.util.List;
 
@@ -27,6 +29,29 @@ import java.util.List;
 public interface PatientQueueingService extends OpenmrsService {
 	
 	/**
+	 * This method gets a patientQueue by the visitNumber
+	 * 
+	 * @param visitNumber The visitNumber String that is used to search for a patientQueue
+	 * @return a patientQueue that matches the visitNumber passed
+	 * @throws APIException
+	 */
+	@Transactional
+	public PatientQueue getPatientQueueByVisitNumber(String visitNumber);
+	
+	/**
+	 * This Generates a visitNumber based on location and date. The Number generated is unique for a
+	 * patient on a given day A patient will only have one patientvisitNumber for a given day. The
+	 * same number will be reassigned to another queue, incase its the same patient on the same day.
+	 * 
+	 * @param location Location which will be used to first three characters of the visitNumber
+	 * @param patient the Patient who the visitNumber is for in a given queue
+	 * @return This will return a String with format LOC-dd/MM/yyy-000-1
+	 * @throws ParseException
+	 * @throws IOException
+	 */
+	public String generateVisitNumber(Location location, Patient patient);
+	
+	/**
 	 * Get a single patient queue record by queueId. The queueId can not be null
 	 * 
 	 * @param queueId Id of the PatientQueue to be retrieved
@@ -34,7 +59,7 @@ public interface PatientQueueingService extends OpenmrsService {
 	 * @throws APIException
 	 */
 	@Transactional(readOnly = true)
-	public PatientQueue getPatientQueueById(Integer queueId) throws APIException;
+	public PatientQueue getPatientQueueById(Integer queueId);
 	
 	/**
 	 * Update or Save patientQueue. Requires a patientQueue
@@ -44,7 +69,7 @@ public interface PatientQueueingService extends OpenmrsService {
 	 * @throws APIException
 	 */
 	@Transactional
-	public PatientQueue savePatientQue(PatientQueue patientQueue) throws Exception;
+	public PatientQueue savePatientQue(PatientQueue patientQueue);
 	
 	/**
 	 * Gets a list of patient queues basing on given parameters.
@@ -61,7 +86,7 @@ public interface PatientQueueingService extends OpenmrsService {
 	 */
 	@Transactional(readOnly = true)
 	public List<PatientQueue> getPatientQueueList(Provider provider, Date fromDate, Date toDate, Location locationTo,
-	        Location locationFrom, Patient patient, PatientQueue.Status status) throws APIException;
+	        Location locationFrom, Patient patient, PatientQueue.Status status);
 	
 	/**
 	 * Mark passed patientQueue completed.
@@ -71,7 +96,7 @@ public interface PatientQueueingService extends OpenmrsService {
 	 * @throws APIException
 	 */
 	@Transactional
-	public PatientQueue completePatientQueue(PatientQueue patientQueue) throws Exception;
+	public PatientQueue completePatientQueue(PatientQueue patientQueue);
 	
 	/**
 	 * This method gets the patientQueue for a patient at a given location which is not complete.
