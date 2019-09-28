@@ -103,7 +103,13 @@ public class PatientQueueingServiceImpl extends BaseOpenmrsService implements Pa
 	
 	@Override
 	public PatientQueue getPatientQueueByQueueNumber(String queueNumber) throws APIException {
-		return dao.getPatientQueueByQueueNumber(queueNumber);
+		List<PatientQueue> patientQueueList = dao.getPatientQueueByQueueNumber(queueNumber);
+		if (patientQueueList.size() > 0) {
+			return patientQueueList.get(0);
+		} else {
+			return null;
+		}
+		
 	}
 	
 	private String processSearchString(String searchString) {

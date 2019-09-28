@@ -14,7 +14,9 @@
 package org.openmrs.module.patientqueueing.page.controller;
 
 import org.apache.commons.lang3.StringUtils;
+import org.openmrs.Location;
 import org.openmrs.Patient;
+import org.openmrs.api.context.Context;
 import org.openmrs.module.appframework.context.AppContextModel;
 import org.openmrs.module.appframework.domain.AppDescriptor;
 import org.openmrs.module.appframework.domain.Extension;
@@ -36,10 +38,12 @@ public class ClinicianDashboardPageController {
 	
 	public Object controller(PageModel model, @RequestParam(required = false, value = "app") AppDescriptor app,
 	        @RequestParam(required = false, value = "dashboard") String dashboard,
+	        @RequestParam(required = false, value = "locationId") Location location,
 	        @SpringBean("adtService") AdtService adtService,
 	        @SpringBean("appFrameworkService") AppFrameworkService appFrameworkService,
 	        @SpringBean("applicationEventService") ApplicationEventService applicationEventService,
-	        @SpringBean("coreAppsProperties") CoreAppsProperties coreAppsProperties, UiSessionContext sessionContext) {
+	        @SpringBean("coreAppsProperties") CoreAppsProperties coreAppsProperties, UiSessionContext sessionContext,
+	        UiUtils ui) {
 		
 		if (StringUtils.isEmpty(dashboard)) {
 			dashboard = "clinicianDashboard";
@@ -74,6 +78,11 @@ public class ClinicianDashboardPageController {
 		model.addAttribute("baseDashboardUrl", coreAppsProperties.getDashboardUrl()); // used for breadcrumbs to link back to the base dashboard in the case when this is used to render a context-specific dashboard
 		model.addAttribute("dashboard", dashboard);
 		model.put("currentLocation", sessionContext.getSessionLocation());
+		
+		if (location != null && sessionContext.getSessionLocation() != location) {
+			sessionContext.setSessionLocation(location);
+			return "redirect:" + ui.pageLink("patientqueueing", "clinicianDashboard");
+		}
 		return null;
 	}
 	

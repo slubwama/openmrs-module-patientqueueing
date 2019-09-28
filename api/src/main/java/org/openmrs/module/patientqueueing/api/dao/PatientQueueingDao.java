@@ -44,9 +44,9 @@ public class PatientQueueingDao {
 		        .add(Restrictions.eq("patient_queue_id", queueId)).uniqueResult();
 	}
 	
-	public PatientQueue getPatientQueueByQueueNumber(String queueNumber) {
-		return (PatientQueue) getSession().createCriteria(PatientQueue.class)
-		        .add(Restrictions.eq("queueNumber", queueNumber)).uniqueResult();
+	public List<PatientQueue> getPatientQueueByQueueNumber(String queueNumber) {
+		return (List<PatientQueue>) getSession().createCriteria(PatientQueue.class)
+		        .add(Restrictions.eq("queueNumber", queueNumber)).list();
 	}
 	
 	public List<PatientQueue> getPatientQueueByPatient(Patient patient) {
