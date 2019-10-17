@@ -46,18 +46,21 @@ public class ClinicianQueueListFragmentController {
 		List<PatientQueue> patientQueueList = new ArrayList();
 		if (!searchfilter.equals("")) {
 			try {
-				patientQueueList = patientQueueingService.searchQueue(searchfilter,
-				    QueueingUtil.dateFormtterString(new Date(), "00:00:00"),
-				    QueueingUtil.dateFormtterString(new Date(), "23:59:59"), null, uiSessionContext.getSessionLocation());
+				patientQueueList = patientQueueingService.getPatientQueueList(searchfilter,
+				    QueueingUtil.dateFormtterDate(new Date(), "00:00:00"),
+				    QueueingUtil.dateFormtterDate(new Date(), "23:59:59"), null, null,
+				    uiSessionContext.getSessionLocation(), null, null);
+				
 			}
 			catch (ParseException e) {
 				log.error(e);
 			}
 		} else {
 			try {
-				patientQueueList = patientQueueingService.getPatientInQueueList(null,
+				patientQueueList = patientQueueingService.getPatientQueueList(null,
 				    QueueingUtil.dateFormtterDate(new Date(), "00:00:00"),
-				    QueueingUtil.dateFormtterDate(new Date(), "23:59:59"), uiSessionContext.getSessionLocation());
+				    QueueingUtil.dateFormtterDate(new Date(), "23:59:59"), null, null,
+				    uiSessionContext.getSessionLocation(), null, null);
 			}
 			catch (ParseException e) {
 				log.error(e);

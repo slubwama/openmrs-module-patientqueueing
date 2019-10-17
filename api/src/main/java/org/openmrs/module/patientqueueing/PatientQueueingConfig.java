@@ -21,10 +21,8 @@ public class PatientQueueingConfig {
 	
 	public static final String MODULE_ID = "patientqueueing";
 	
-	public static final String QUEUE_STATUS_COMPLETED = "completed";
-	
-	public static final String QUEUE_STATUS_PENDING = "pending";
-	
-	public static final String FACILITY_VISIT_TYPE_GP = "patientqueueing.defaultFacilityVisitTypeUUID";
+	public static enum status {
+		PENDING, COMPLETED, PICKED, REVIEWED
+	}
 	
 }

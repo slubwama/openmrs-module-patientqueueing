@@ -13,7 +13,6 @@ import org.openmrs.Location;
 import org.openmrs.Patient;
 import org.openmrs.Provider;
 import org.openmrs.annotation.Authorized;
-import org.openmrs.api.APIException;
 import org.openmrs.api.OpenmrsService;
 import org.openmrs.module.patientqueueing.model.PatientQueue;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,33 +30,33 @@ public interface PatientQueueingService extends OpenmrsService {
 	
 	@Authorized
 	@Transactional(readOnly = true)
-	public abstract PatientQueue getPatientQueueById(String queueId) throws APIException;
+	public abstract PatientQueue getPatientQueueById(String queueId);
 	
-	public List<PatientQueue> getPatientQueueByPatient(Patient patient) throws APIException;
+	public List<PatientQueue> getPatientQueueByPatient(Patient patient);
 	
-	@Transactional
+	@Transactional(readOnly = true)
 	public abstract List<PatientQueue> getPatientInQueueList(Provider provider, Date fromDate, Date toDate,
-	        Location sessionLocation) throws APIException;
+	        Location sessionLocation);
 	
-	@Transactional
-	public abstract List<PatientQueue> getPatientInQueueList(Date fromDate, Date toDate, Location sessionLocation)
-	        throws APIException;
+	@Transactional(readOnly = true)
+	public abstract List<PatientQueue> getPatientInQueueList(Date fromDate, Date toDate, Location sessionLocation);
 	
+	@Transactional(readOnly = true)
 	public List<PatientQueue> getPatientInQueueList(Provider provider, Date fromDate, Date toDate, Location sessionLocation,
-	        Patient patient, String status) throws APIException;
+	        Patient patient, String status);
 	
 	@Transactional
-	public abstract PatientQueue savePatientQue(PatientQueue patientQueue) throws APIException;
+	public abstract PatientQueue savePatientQue(PatientQueue patientQueue);
 	
 	@Transactional
-	public abstract PatientQueue completeQueue(PatientQueue patientQueue, String status) throws APIException;
+	public abstract PatientQueue completeQueue(PatientQueue patientQueue, String status);
 	
-	@Transactional
-	public List<PatientQueue> searchQueue(String searchString, String fromDate, String toDate, Provider provider,
-	        Location sessionLocation) throws APIException;
-	
-	@Transactional
-	public PatientQueue getPatientQueueByQueueNumber(String queueNumber) throws APIException;
+	@Transactional(readOnly = true)
+	public PatientQueue getPatientQueueByQueueNumber(String queueNumber);
 	
 	public String generateQueueNumber(Location location) throws ParseException, IOException;
+	
+	@Transactional(readOnly = true)
+	public List<PatientQueue> getPatientQueueList(String searchString, Date fromDate, Date toDate, Patient patient,
+	        Provider provider, Location locationTo, Location locationFrom, String status);
 }
