@@ -21,8 +21,4 @@ public class PatientQueueingConfig {
 	
 	public static final String MODULE_ID = "patientqueueing";
 	
-	public static enum status {
-		PENDING, COMPLETED, PICKED, REVIEWED
-	}
-	
 }

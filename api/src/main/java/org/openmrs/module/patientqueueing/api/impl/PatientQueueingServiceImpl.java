@@ -13,17 +13,21 @@ import org.openmrs.Location;
 import org.openmrs.Patient;
 import org.openmrs.Provider;
 import org.openmrs.api.impl.BaseOpenmrsService;
+import org.openmrs.module.patientqueueing.QueueingUtils;
 import org.openmrs.module.patientqueueing.api.PatientQueueingService;
 import org.openmrs.module.patientqueueing.api.dao.PatientQueueingDao;
 import org.openmrs.module.patientqueueing.model.PatientQueue;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
 import java.text.ParseException;
-import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 
 public class PatientQueueingServiceImpl extends BaseOpenmrsService implements PatientQueueingService {
+	
+	private static final Logger log = LoggerFactory.getLogger(PatientQueueingServiceImpl.class);
 	
 	PatientQueueingDao dao;
 	
@@ -31,38 +35,9 @@ public class PatientQueueingServiceImpl extends BaseOpenmrsService implements Pa
 		this.dao = dao;
 	}
 	
-	public PatientQueue getPatientQueueById(String queueId) {
-		return dao.getPatientQueueById(queueId);
-	}
-	
-	public List<PatientQueue> getPatientQueueByPatient(Patient patient) {
-		return getPatientQueueList(null, null, null, patient, null, null, null, null);
-	}
-	
-	public List<PatientQueue> getPatientInQueueList(Provider provider, Date fromDate, Date toDate, Location sessionLocation) {
-		return dao.getPatientQueueList(null, fromDate, toDate, null, provider, sessionLocation, null, null);
-	}
-	
-	public List<PatientQueue> getPatientInQueueList(Provider provider, Date fromDate, Date toDate, Location sessionLocation,
-	        Patient patient, String status) {
-		return dao.getPatientQueueList(null, fromDate, toDate, patient, provider, sessionLocation, null, status);
-	}
-	
-	@Override
-	public List<PatientQueue> getPatientInQueueList(Date fromDate, Date toDate, Location sessionLocation) {
-		return dao.getPatientQueueList(null, fromDate, toDate, null, null, sessionLocation, null, null);
-	}
-	
-	public PatientQueue savePatientQue(PatientQueue patientQueue) {
-		return dao.savePatientQueue(patientQueue);
-	}
-	
-	@Override
-	public PatientQueue completeQueue(PatientQueue patientQueue, String status) {
-		patientQueue.setStatus(status);
-		return dao.savePatientQueue(patientQueue);
-	}
-	
+	/**
+	 * @see org.openmrs.module.patientqueueing.api.PatientQueueingService#getPatientQueueByQueueNumber(java.lang.String)
+	 */
 	@Override
 	public PatientQueue getPatientQueueByQueueNumber(String queueNumber) {
 		List<PatientQueue> patientQueueList = dao.getPatientQueueByQueueNumber(queueNumber);
@@ -74,46 +49,118 @@ public class PatientQueueingServiceImpl extends BaseOpenmrsService implements Pa
 		
 	}
 	
-	@Override
-	public List<PatientQueue> getPatientQueueList(String searchString, Date fromDate, Date toDate, Patient patient,
-	        Provider provider, Location locationTo, Location locationFrom, String status) {
-		return dao.getPatientQueueList(searchString, fromDate, toDate, patient, provider, locationTo, locationFrom, status);
+	/**
+	 * @see org.openmrs.module.patientqueueing.api.PatientQueueingService#generateQueueNumber(org.openmrs.Location,
+	 *      java.util.Date, org.openmrs.Patient)
+	 */
+	public String generateQueueNumber(Location location, Date date, Patient patient) {
+		
+		List<PatientQueue> patientQueueList = new ArrayList<PatientQueue>();
+		
+		try {
+			patientQueueList = getPatientQueueList(null, QueueingUtils.convertDateToDefaultDateFormat(date, "00:00:00"),
+			    QueueingUtils.convertDateToDefaultDateFormat(date, "23:59:59"), null, location, patient, null);
+		}
+		catch (ParseException e) {
+			log.error("", e);
+		}
+		
+		if (!patientQueueList.isEmpty() && patientQueueList.get(0).getQueueNumber() != null) {
+			return patientQueueList.get(0).getQueueNumber();
+		} else {
+			
+			String dateString = QueueingUtils.convertDateToDefaultDateFormatAsString(date, null);
+			
+			String letter = location.getName();
+			
+			if (letter.length() > 3) {
+				letter = letter.substring(0, 3);
+			}
+			
+			String defaultQueueNumber;
+			
+			int id = 0;
+			do {
+				++id;
+				String appendZeroes;
+				
+				if (id <= 9) {
+					appendZeroes = "00";
+				} else if (id < 100) {
+					appendZeroes = "0";
+				} else
+					appendZeroes = "";
+				
+				defaultQueueNumber = dateString + "-" + letter + "-" + appendZeroes + id;
+			} while (isQueueNumberIdExisting(defaultQueueNumber));
+			
+			return defaultQueueNumber;
+		}
 	}
 	
 	/**
-	 * Generate Checkin ID
-	 * 
-	 * @param location
-	 * @return
-	 * @throws ParseException
-	 * @throws IOException
+	 * @see org.openmrs.module.patientqueueing.api.PatientQueueingService#savePatientQue(org.openmrs.module.patientqueueing.model.PatientQueue)
 	 */
-	public String generateQueueNumber(Location location) {
-		SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy");
-		String date = sdf.format(new Date());
-		String letter = location.getName();
-		if (letter.length() > 3) {
-			letter = letter.substring(0, 3);
-		}
-		String defaultQueueNumber = "";
-		int id = 0;
-		do {
-			++id;
-			defaultQueueNumber = date + "-" + letter + "-" + "00" + id;
-		} while (isQueueNumberIdExisting(defaultQueueNumber));
+	public PatientQueue savePatientQue(PatientQueue patientQueue) {
+		PatientQueue currentQueue = dao.getIncompletePatientQueue(patientQueue.getPatient(), patientQueue.getLocationTo());
 		
-		return defaultQueueNumber;
+		if (currentQueue != null) {
+			completePatientQueue(currentQueue);
+		}
+		return dao.savePatientQueue(patientQueue);
 	}
 	
-	public boolean isQueueNumberIdExisting(String queueNumber) {
+	/**
+	 * @see org.openmrs.module.patientqueueing.api.PatientQueueingService#getPatientQueueById(java.lang.Integer)
+	 */
+	public PatientQueue getPatientQueueById(Integer queueId) {
+		return dao.getPatientQueueById(queueId);
+	}
+	
+	/**
+	 * @see org.openmrs.module.patientqueueing.api.PatientQueueingService#getPatientQueueList(org.openmrs.Provider,
+	 *      java.util.Date, java.util.Date, org.openmrs.Location, org.openmrs.Location,
+	 *      org.openmrs.Patient, org.openmrs.module.patientqueueing.model.PatientQueue.Status)
+	 */
+	public List<PatientQueue> getPatientQueueList(Provider provider, Date fromDate, Date toDate, Location locationTo,
+	        Location locationFrom, Patient patient, PatientQueue.Status status) {
+		return dao.getPatientQueueList(provider, fromDate, toDate, locationTo, locationFrom, patient, status);
+	}
+	
+	/**
+	 * @see org.openmrs.module.patientqueueing.api.PatientQueueingService#completePatientQueue(org.openmrs.module.patientqueueing.model.PatientQueue)
+	 */
+	@Override
+	public PatientQueue completePatientQueue(PatientQueue patientQueue) {
+		patientQueue.setStatus(PatientQueue.Status.COMPLETED);
+		return dao.savePatientQueue(patientQueue);
+	}
+	
+	/**
+	 * @see org.openmrs.module.patientqueueing.api.PatientQueueingService#getIncompletePatientQueue(org.openmrs.Patient,
+	 *      org.openmrs.Location)
+	 */
+	public PatientQueue getIncompletePatientQueue(Patient patient, Location locationTo) {
+		
+		return dao.getIncompletePatientQueue(patient, locationTo);
+	}
+	
+	/**
+	 * This Method is a helper method to the generateQueueNumber which checks if the queueNumber
+	 * generated exists
+	 * 
+	 * @param queueNumber A queueNumber in form of a string which will be check to determine if it
+	 *            exists
+	 * @return
+	 */
+	private boolean isQueueNumberIdExisting(String queueNumber) {
 		PatientQueue patientQueue = getPatientQueueByQueueNumber(queueNumber);
-		boolean isQueueNumberExisting = false;
+		boolean queueNumberExists = false;
 		
 		if (patientQueue != null) {
-			isQueueNumberExisting = true;
+			queueNumberExists = true;
 		}
-		
-		return isQueueNumberExisting;
+		return queueNumberExists;
 	}
 	
 }

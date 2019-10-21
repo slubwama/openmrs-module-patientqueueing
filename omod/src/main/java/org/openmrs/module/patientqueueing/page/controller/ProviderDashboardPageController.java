@@ -14,9 +14,6 @@
 package org.openmrs.module.patientqueueing.page.controller;
 
 import org.apache.commons.lang3.StringUtils;
-import org.openmrs.Location;
-import org.openmrs.Patient;
-import org.openmrs.api.context.Context;
 import org.openmrs.module.appframework.context.AppContextModel;
 import org.openmrs.module.appframework.domain.AppDescriptor;
 import org.openmrs.module.appframework.domain.Extension;
@@ -34,21 +31,19 @@ import org.openmrs.ui.framework.UiUtils;
 import java.util.Collections;
 import java.util.List;
 
-public class ClinicianDashboardPageController {
+public class ProviderDashboardPageController {
 	
-	public Object controller(PageModel model, @RequestParam(required = false, value = "app") AppDescriptor app,
+	public Object controller(PageModel model, @RequestParam(required = false, value = "apps") AppDescriptor app,
 	        @RequestParam(required = false, value = "dashboard") String dashboard,
-	        @RequestParam(required = false, value = "locationId") Location location,
 	        @SpringBean("adtService") AdtService adtService,
 	        @SpringBean("appFrameworkService") AppFrameworkService appFrameworkService,
 	        @SpringBean("applicationEventService") ApplicationEventService applicationEventService,
-	        @SpringBean("coreAppsProperties") CoreAppsProperties coreAppsProperties, UiSessionContext sessionContext,
-	        UiUtils ui) {
+	        @SpringBean("coreAppsProperties") CoreAppsProperties coreAppsProperties, UiSessionContext sessionContext) {
 		
 		if (StringUtils.isEmpty(dashboard)) {
-			dashboard = "clinicianDashboard";
+			dashboard = "providerDashboard";
 		}
-		model.addAttribute("app", app);
+		model.addAttribute("apps", app);
 		UiUtils uiUtils = new BasicUiUtils();
 		
 		AppContextModel contextModel = sessionContext.generateAppContextModel();
@@ -70,20 +65,16 @@ public class ClinicianDashboardPageController {
 		model.addAttribute("leftColumnFragments", leftColumnFragments);
 		
 		List<Extension> otherActions = appFrameworkService.getExtensionsForCurrentUser(
-		    (dashboard == "patientDashboard" ? "clinicianFacingPatientDashboard" : dashboard) + ".otherActions",
-		    contextModel);
+		    (dashboard == "providerDashboard" ? "provider" : dashboard) + ".otherActions", contextModel);
 		Collections.sort(otherActions);
 		model.addAttribute("otherActions", otherActions);
 		
-		model.addAttribute("baseDashboardUrl", coreAppsProperties.getDashboardUrl()); // used for breadcrumbs to link back to the base dashboard in the case when this is used to render a context-specific dashboard
-		model.addAttribute("dashboard", dashboard);
-		model.put("currentLocation", sessionContext.getSessionLocation());
+		// used for breadcrumbs to link back to the base dashboard in the case when this is used to render a context-specific dashboard
+		model.addAttribute("baseDashboardUrl", coreAppsProperties.getDashboardUrl());
 		
-		if (location != null && sessionContext.getSessionLocation() != location) {
-			sessionContext.setSessionLocation(location);
-			return "redirect:" + ui.pageLink("patientqueueing", "clinicianDashboard");
-		}
+		model.addAttribute("dashboard", dashboard);
+		
+		model.put("currentLocation", sessionContext.getSessionLocation());
 		return null;
 	}
-	
 }

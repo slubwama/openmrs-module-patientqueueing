@@ -7,6 +7,8 @@ import org.openmrs.Encounter;
 import org.openmrs.BaseOpenmrsData;
 
 import javax.persistence.Entity;
+import javax.persistence.Enumerated;
+import javax.persistence.EnumType;
 import javax.persistence.Table;
 import javax.persistence.Id;
 import javax.persistence.GeneratedValue;
@@ -45,7 +47,8 @@ public class PatientQueue extends BaseOpenmrsData implements Serializable {
 	private Encounter encounter;
 	
 	@Column(name = "status", length = 255)
-	private String status;
+	@Enumerated(EnumType.STRING)
+	private PatientQueue.Status status;
 	
 	@Column(name = "queue_number", length = 255)
 	private String queueNumber;
@@ -56,10 +59,11 @@ public class PatientQueue extends BaseOpenmrsData implements Serializable {
 	@Column(name = "priority_comment", length = 255)
 	private String priorityComment;
 	
-	@Column(name = "comment", length = 255)
-	private String comment;
-	
 	public PatientQueue() {
+	}
+	
+	public enum Status {
+		PENDING, COMPLETED, PICKED;
 	}
 	
 	public Integer getId() {
@@ -134,11 +138,11 @@ public class PatientQueue extends BaseOpenmrsData implements Serializable {
 		this.priorityComment = priorityComment;
 	}
 	
-	public String getStatus() {
+	public Status getStatus() {
 		return status;
 	}
 	
-	public void setStatus(String status) {
+	public void setStatus(Status status) {
 		this.status = status;
 	}
 	
@@ -148,13 +152,5 @@ public class PatientQueue extends BaseOpenmrsData implements Serializable {
 	
 	public void setQueueNumber(String queueNumber) {
 		this.queueNumber = queueNumber;
-	}
-	
-	public String getComment() {
-		return comment;
-	}
-	
-	public void setComment(String comment) {
-		this.comment = comment;
 	}
 }
