@@ -41,38 +41,10 @@
 	<aware_of_modules>
 		<aware_of_module>org.openmrs.module.legacyui</aware_of_module>
 	</aware_of_modules>
-
-	<globalProperty>
-		<property>patientqueueing.defaultDateFormat</property>
-		<defaultValue>dd/MM/yyyy</defaultValue>
-		<description>The date format without time</description>
-	</globalProperty>
-
-	<globalProperty>
-		<property>patientqueueing.displayDateFormat</property>
-		<defaultValue>dd/MM/yyyy HH:mm:ss</defaultValue>
-		<description>Date format for patientqueueing display and date pickers</description>
-	</globalProperty>
 	
 	
 	<!-- Internationalization -->
 	<!-- All message codes should start with @MODULE_ID@.* -->
-
-	<privilege>
-		<name>App: patientqueueing.providerDashboard</name>
-		<description>Able to access Provider Dashboard</description>
-	</privilege>
-
-	<privilege>
-		<name>Task: patientqueueing.completePatientQueue</name>
-		<description>Able to complete a patient queue</description>
-	</privilege>
-
-	<privilege>
-		<name>Task: patientqueueing.sendPatientToQueue</name>
-		<description>Ability to send Patient To Queue</description>
-	</privilege>
-
 	<messages>
 		<lang>en</lang>
 		<file>messages.properties</file>
@@ -86,5 +58,19 @@
 		<file>messages_es.properties</file>
 	</messages>
 	<!-- /Internationalization -->
+
+	<privilege>
+		<name>App: patientqueueing.accessClinicianDashboard</name>
+		<description>Allows access to Clinician Dashboard.</description>
+	</privilege>
+	<privilege>
+		<name>Task: patientqueueing.addPatientToQueue</name>
+		<description>Ability to Add aPatient to a Queue.</description>
+	</privilege>
+
+	<privilege>
+		<name>Task: patientqueueing.completePatientQueue</name>
+		<description>Ability to Complete a Patient Queue.</description>
+	</privilege>
 </module>
 

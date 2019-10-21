@@ -4,7 +4,7 @@
 <script type="text/javascript">
     var breadcrumbs = [
         { icon: "icon-home", link: '/' + OPENMRS_CONTEXT_PATH + '/index.htm' },
-        { label: "${currentLocation?.name}" , link: '#'}
+        { label: "${ui.message("patientqueueing.provider.dashboard.label")}" , link: '#'},{ label: "${currentLocation?.name}" , link: '#'}
     ];
 
     // add on breadcrumb if it has been defined in messages.properties
@@ -20,6 +20,7 @@
     });
 
     jq(document).ready(function () {
+
         jq("#okay").click(function () {
             patientqueue.createReadMessageDialog();
         });

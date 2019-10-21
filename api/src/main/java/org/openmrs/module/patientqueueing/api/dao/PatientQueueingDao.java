@@ -9,7 +9,10 @@
  */
 package org.openmrs.module.patientqueueing.api.dao;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.hibernate.Criteria;
+import org.hibernate.SQLQuery;
 import org.hibernate.criterion.Order;
 import org.hibernate.criterion.Restrictions;
 import org.openmrs.Location;
@@ -18,8 +21,6 @@ import org.openmrs.Provider;
 import org.openmrs.api.db.hibernate.DbSession;
 import org.openmrs.api.db.hibernate.DbSessionFactory;
 import org.openmrs.module.patientqueueing.model.PatientQueue;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Repository;
 
@@ -29,7 +30,7 @@ import java.util.List;
 @Repository("patientqueueing.PatientQueueingDao")
 public class PatientQueueingDao {
 	
-	private static final Logger log = LoggerFactory.getLogger(PatientQueueingDao.class);
+	protected final Log log = LogFactory.getLog(getClass());
 	
 	@Autowired
 	DbSessionFactory sessionFactory;
@@ -38,12 +39,9 @@ public class PatientQueueingDao {
 		return sessionFactory.getCurrentSession();
 	}
 	
-	/**
-	 * @see org.openmrs.module.patientqueueing.api.PatientQueueingService#getPatientQueueById(java.lang.Integer)
-	 */
-	public PatientQueue getPatientQueueById(Integer queueId) {
+	public PatientQueue getPatientQueueById(String queueId) {
 		return (PatientQueue) getSession().createCriteria(PatientQueue.class)
-		        .add(Restrictions.eq("patientQueueId", queueId)).uniqueResult();
+		        .add(Restrictions.eq("patient_queue_id", queueId)).uniqueResult();
 	}
 	
 	public List<PatientQueue> getPatientQueueByQueueNumber(String queueNumber) {
@@ -57,15 +55,31 @@ public class PatientQueueingDao {
 		return criteria.list();
 	}
 	
-	/**
-	 * @see org.openmrs.module.patientqueueing.api.PatientQueueingService#getPatientQueueList(org.openmrs.Provider,
-	 *      java.util.Date, java.util.Date, org.openmrs.Location, org.openmrs.Location,
-	 *      org.openmrs.Patient, org.openmrs.module.patientqueueing.model.PatientQueue.Status)
-	 */
-	public List<PatientQueue> getPatientQueueList(Provider provider, Date fromDate, Date toDate, Location locationTo,
-	        Location locationFrom, Patient patient, PatientQueue.Status status) {
+	public PatientQueue savePatientQueue(PatientQueue patientQueue) {
+		try {
+			sessionFactory.getCurrentSession().saveOrUpdate(patientQueue);
+			return patientQueue;
+		}
+		catch (Exception e) {
+			log.error(e);
+		}
+		return null;
+	}
+	
+	public List<PatientQueue> getPatientInQueue(Provider provider, Date fromDate, Date toDate, Location sessionLocation) {
 		Criteria criteria = getSession().createCriteria(PatientQueue.class);
+		criteria.add(Restrictions.between("dateCreated", fromDate, toDate));
 		
+		if (provider != null) {
+			criteria.add(Restrictions.eq("provider", provider));
+		}
+		criteria.add(Restrictions.eq("locationTo", sessionLocation));
+		return criteria.list();
+	}
+	
+	public List<PatientQueue> getPatientInQueue(Provider provider, Date fromDate, Date toDate, Location location,
+	        Patient patient, String status) {
+		Criteria criteria = getSession().createCriteria(PatientQueue.class);
 		if (fromDate != null && toDate != null) {
 			criteria.add(Restrictions.between("dateCreated", fromDate, toDate));
 		}
@@ -74,12 +88,8 @@ public class PatientQueueingDao {
 			criteria.add(Restrictions.eq("provider", provider));
 		}
 		
-		if (locationTo != null) {
-			criteria.add(Restrictions.eq("locationTo", locationTo));
-		}
-		
-		if (locationFrom != null) {
-			criteria.add(Restrictions.eq("locationFrom", locationFrom));
+		if (location != null) {
+			criteria.add(Restrictions.eq("locationTo", location));
 		}
 		
 		if (patient != null) {
@@ -95,32 +105,11 @@ public class PatientQueueingDao {
 		return criteria.list();
 	}
 	
-	/**
-	 * @see org.openmrs.module.patientqueueing.api.PatientQueueingService#savePatientQue(org.openmrs.module.patientqueueing.model.PatientQueue)
-	 */
-	public PatientQueue savePatientQueue(PatientQueue patientQueue) {
-		sessionFactory.getCurrentSession().saveOrUpdate(patientQueue);
-		return patientQueue;
-	}
-	
-	/**
-	 * @see org.openmrs.module.patientqueueing.api.PatientQueueingService#getIncompletePatientQueue(org.openmrs.Patient,
-	 *      org.openmrs.Location)
-	 */
-	public PatientQueue getIncompletePatientQueue(Patient patient, Location locationTo) {
-		Criteria criteria = getSession().createCriteria(PatientQueue.class);
-		
-		if (locationTo != null) {
-			criteria.add(Restrictions.eq("locationTo", locationTo));
-		}
-		
-		if (patient != null) {
-			criteria.add(Restrictions.eq("patient", patient));
-		}
-		
-		criteria.add(Restrictions.not(Restrictions.in("status", new Enum[] { PatientQueue.Status.COMPLETED })));
-		
-		return (PatientQueue) criteria.uniqueResult();
+	public List<PatientQueue> searchQueue(String query) {
+		SQLQuery sqlQuery = getSession().createSQLQuery(query);
+		sqlQuery.addEntity(PatientQueue.class);
+		List<PatientQueue> patientQueueList = sqlQuery.list();
+		return patientQueueList;
 	}
 	
 }
