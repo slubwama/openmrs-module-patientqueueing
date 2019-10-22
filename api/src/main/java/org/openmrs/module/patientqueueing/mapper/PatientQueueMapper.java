@@ -170,11 +170,6 @@ public class PatientQueueMapper implements Serializable {
 	public String getEncounterId() {
 		return encounterId;
 	}
-
-
-
-
-
 	
 	public void setEncounterId(String encounterId) {
 		this.encounterId = encounterId;
