@@ -60,4 +60,9 @@ public interface PatientQueueingService extends OpenmrsService {
 	public PatientQueue getPatientQueueByQueueNumber(String queueNumber) throws APIException;
 	
 	public String generateQueueNumber(Location location) throws ParseException, IOException;
+
+
+	@Transactional(readOnly = true)
+	public List<PatientQueue> getPatientQueueList(String searchString, Date fromDate, Date toDate, Patient patient,
+												  Provider provider, Location locationTo, Location locationFrom, String status);
 }
