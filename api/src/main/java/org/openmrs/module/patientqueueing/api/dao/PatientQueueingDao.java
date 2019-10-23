@@ -134,6 +134,19 @@ public class PatientQueueingDao {
 		
 		return (PatientQueue) criteria.uniqueResult();
 	}
+
+	/**
+	 * @see org.openmrs.module.patientqueueing.api.PatientQueueingService#getMostRecentQueue(org.openmrs.Patient)
+	 */
+	public PatientQueue getMostRecentQueue(Patient patient) {
+		Criteria criteria = getSession().createCriteria(PatientQueue.class);
+
+		criteria.add(Restrictions.eq("patient", patient));
+		criteria.addOrder(Order.desc("dateCreated"));
+		criteria.setMaxResults(1);
+
+		return (PatientQueue) criteria.uniqueResult();
+	}
 	
 	public List<PatientQueue> getPatientQueueList(List<Patient> patientList, Date fromDate, Date toDate, Patient patient,
 	        Provider provider, Location locationTo, Location locationFrom, String status) {
