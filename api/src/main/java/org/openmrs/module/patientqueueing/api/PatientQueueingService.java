@@ -107,4 +107,8 @@ public interface PatientQueueingService extends OpenmrsService {
 	 */
 	@Transactional(readOnly = true)
 	public PatientQueue getIncompletePatientQueue(Patient patient, Location locationTo);
+	
+	@Transactional(readOnly = true)
+	public List<PatientQueue> getPatientQueueList(String searchString, Date fromDate, Date toDate, Patient patient,
+	        Provider provider, Location locationTo, Location locationFrom, String status);
 }

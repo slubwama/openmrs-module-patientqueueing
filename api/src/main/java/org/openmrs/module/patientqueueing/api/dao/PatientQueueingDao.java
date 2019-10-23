@@ -31,6 +31,18 @@ public class PatientQueueingDao {
 	
 	private static final Logger log = LoggerFactory.getLogger(PatientQueueingDao.class);
 	
+	private static final String LOCATION_TO = "locationTo";
+	
+	private static final String LOCATION_FROM = "locationFrom";
+	
+	private static final String PROVIDER = "provider";
+	
+	private static final String STATUS = "status";
+	
+	private static final String PATIENT = "patient";
+	
+	private static final String DATE_CREATED = "dateCreated";
+	
 	@Autowired
 	DbSessionFactory sessionFactory;
 	
@@ -121,6 +133,43 @@ public class PatientQueueingDao {
 		criteria.add(Restrictions.not(Restrictions.in("status", new Enum[] { PatientQueue.Status.COMPLETED })));
 		
 		return (PatientQueue) criteria.uniqueResult();
+	}
+	
+	public List<PatientQueue> getPatientQueueList(List<Patient> patientList, Date fromDate, Date toDate, Patient patient,
+	        Provider provider, Location locationTo, Location locationFrom, String status) {
+		Criteria criteria = getSession().createCriteria(PatientQueue.class);
+		
+		if (!patientList.isEmpty()) {
+			criteria.add(Restrictions.in(PATIENT, patientList));
+		}
+		
+		if (fromDate != null && toDate != null) {
+			criteria.add(Restrictions.between(DATE_CREATED, fromDate, toDate));
+		}
+		
+		if (provider != null) {
+			criteria.add(Restrictions.eq(PROVIDER, provider));
+		}
+		
+		if (provider != null) {
+			criteria.add(Restrictions.eq(PATIENT, patient));
+		}
+		
+		if (locationTo != null) {
+			criteria.add(Restrictions.eq(LOCATION_TO, locationTo));
+		}
+		
+		if (locationFrom != null) {
+			criteria.add(Restrictions.eq(LOCATION_FROM, locationFrom));
+		}
+		
+		if (status != null) {
+			criteria.add(Restrictions.eq(STATUS, status));
+		}
+		
+		criteria.addOrder(Order.desc(DATE_CREATED));
+		
+		return criteria.list();
 	}
 	
 }

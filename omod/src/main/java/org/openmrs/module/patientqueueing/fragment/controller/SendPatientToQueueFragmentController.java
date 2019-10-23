@@ -30,42 +30,46 @@ import java.io.IOException;
 import java.util.Date;
 
 public class SendPatientToQueueFragmentController {
-
-    private final Logger log = LoggerFactory.getLogger(SendPatientToQueueFragmentController.class);
-
-    public void controller(@SpringBean FragmentModel pageModel, @SpringBean("locationService") LocationService locationService, @RequestParam("patientId") Patient patient) {
-
-        pageModel.put("birthDate", patient.getBirthdate());
-        pageModel.put("patient", patient);
-        pageModel.put("patientId", patient.getPatientId());
-        pageModel.put("locationList", (locationService.getAllLocations()));
-        pageModel.put("providerList", Context.getProviderService().getAllProviders(false));
-    }
-
-    public SimpleObject create(@RequestParam(value = "patientId") Patient patient, @RequestParam(value = "providerId", required = false) Provider provider, UiUtils ui, @RequestParam("locationId") Location location, UiSessionContext uiSessionContext) throws IOException {
-        PatientQueue patientQueue = new PatientQueue();
-
-        PatientQueueingService patientQueueingService = Context.getService(PatientQueueingService.class);
-        patientQueue.setLocationFrom(uiSessionContext.getSessionLocation());
-        patientQueue.setPatient(patient);
-        patientQueue.setLocationTo(location);
-        patientQueue.setProvider(provider);
-        patientQueue.setStatus(PatientQueue.Status.PENDING);
-        patientQueue.setVisitNumber(patientQueueingService.generateVisitNumber(location, patient));
-        patientQueue.setCreator(uiSessionContext.getCurrentUser());
-        patientQueue.setDateCreated(new Date());
-
-        patientQueueingService.savePatientQue(patientQueue);
-
-        SimpleObject simpleObject = new SimpleObject();
-
-        ObjectMapper objectMapper = new ObjectMapper();
-
-        String toastSuccess = String.format(ui.message("patientqueueing.task.sendPatientToQueue.toastSuccess"), patientQueue.getLocationTo().getName(), patientQueue.getVisitNumber());
-
-        simpleObject.put("toastMessage", objectMapper.writeValueAsString(toastSuccess));
-
-        return simpleObject;
-
-    }
+	
+	private final Logger log = LoggerFactory.getLogger(SendPatientToQueueFragmentController.class);
+	
+	public void controller(@SpringBean FragmentModel pageModel,
+	        @SpringBean("locationService") LocationService locationService, @RequestParam("patientId") Patient patient) {
+		
+		pageModel.put("birthDate", patient.getBirthdate());
+		pageModel.put("patient", patient);
+		pageModel.put("patientId", patient.getPatientId());
+		pageModel.put("locationList", (locationService.getAllLocations()));
+		pageModel.put("providerList", Context.getProviderService().getAllProviders(false));
+	}
+	
+	public SimpleObject create(@RequestParam(value = "patientId") Patient patient,
+	        @RequestParam(value = "providerId", required = false) Provider provider, UiUtils ui,
+	        @RequestParam("locationId") Location location, UiSessionContext uiSessionContext) throws IOException {
+		PatientQueue patientQueue = new PatientQueue();
+		
+		PatientQueueingService patientQueueingService = Context.getService(PatientQueueingService.class);
+		patientQueue.setLocationFrom(uiSessionContext.getSessionLocation());
+		patientQueue.setPatient(patient);
+		patientQueue.setLocationTo(location);
+		patientQueue.setProvider(provider);
+		patientQueue.setStatus(PatientQueue.Status.PENDING);
+		patientQueue.setVisitNumber(patientQueueingService.generateVisitNumber(location, patient));
+		patientQueue.setCreator(uiSessionContext.getCurrentUser());
+		patientQueue.setDateCreated(new Date());
+		
+		patientQueueingService.savePatientQue(patientQueue);
+		
+		SimpleObject simpleObject = new SimpleObject();
+		
+		ObjectMapper objectMapper = new ObjectMapper();
+		
+		String toastSuccess = String.format(ui.message("patientqueueing.task.sendPatientToQueue.toastSuccess"), patientQueue
+		        .getLocationTo().getName(), patientQueue.getVisitNumber());
+		
+		simpleObject.put("toastMessage", objectMapper.writeValueAsString(toastSuccess));
+		
+		return simpleObject;
+		
+	}
 }

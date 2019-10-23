@@ -12,6 +12,8 @@ package org.openmrs.module.patientqueueing.api.impl;
 import org.openmrs.Location;
 import org.openmrs.Patient;
 import org.openmrs.Provider;
+import org.openmrs.api.PatientService;
+import org.openmrs.api.context.Context;
 import org.openmrs.api.impl.BaseOpenmrsService;
 import org.openmrs.module.patientqueueing.QueueingUtils;
 import org.openmrs.module.patientqueueing.api.PatientQueueingService;
@@ -20,11 +22,7 @@ import org.openmrs.module.patientqueueing.model.PatientQueue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.Calendar;
-import java.util.Date;
-import java.util.List;
-import java.util.ArrayList;
-import java.util.GregorianCalendar;
+import java.util.*;
 
 import java.text.ParseException;
 
@@ -172,6 +170,27 @@ public class PatientQueueingServiceImpl extends BaseOpenmrsService implements Pa
 			
 			return defaultvisitNumber;
 		}
+	}
+	
+	@Override
+	public List<PatientQueue> getPatientQueueList(String searchString, Date fromDate, Date toDate, Patient patient,
+	        Provider provider, Location locationTo, Location locationFrom, String status) {
+		return dao.getPatientQueueList(processPatientSearchString(searchString), fromDate, toDate, patient, provider,
+		    locationTo, locationFrom, status);
+	}
+	
+	private List<Patient> processPatientSearchString(String searchString) {
+		PatientService patientService = Context.getPatientService();
+		
+		List list = Arrays.asList(searchString.split(" "));
+		
+		List<Patient> patientList = new ArrayList<Patient>();
+		
+		for (Object o : list) {
+			List<Patient> patients = patientService.getPatients(o.toString());
+			patientList.addAll(patients);
+		}
+		return patientList;
 	}
 	
 }
