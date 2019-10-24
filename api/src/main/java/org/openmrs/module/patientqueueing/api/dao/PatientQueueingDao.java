@@ -58,17 +58,6 @@ public class PatientQueueingDao {
 		        .add(Restrictions.eq("patientQueueId", queueId)).uniqueResult();
 	}
 	
-	public List<PatientQueue> getPatientQueueByVisitNumber(String visitNumber) {
-		return (List<PatientQueue>) getSession().createCriteria(PatientQueue.class)
-		        .add(Restrictions.eq("visitNumber", visitNumber)).list();
-	}
-	
-	public List<PatientQueue> getPatientQueueByPatient(Patient patient) {
-		Criteria criteria = getSession().createCriteria(PatientQueue.class);
-		criteria.add(Restrictions.eq("patient", patient));
-		return criteria.list();
-	}
-	
 	/**
 	 * @see org.openmrs.module.patientqueueing.api.PatientQueueingService#getPatientQueueList(org.openmrs.Provider,
 	 *      java.util.Date, java.util.Date, org.openmrs.Location, org.openmrs.Location,
@@ -134,17 +123,17 @@ public class PatientQueueingDao {
 		
 		return (PatientQueue) criteria.uniqueResult();
 	}
-
+	
 	/**
 	 * @see org.openmrs.module.patientqueueing.api.PatientQueueingService#getMostRecentQueue(org.openmrs.Patient)
 	 */
 	public PatientQueue getMostRecentQueue(Patient patient) {
 		Criteria criteria = getSession().createCriteria(PatientQueue.class);
-
+		
 		criteria.add(Restrictions.eq("patient", patient));
 		criteria.addOrder(Order.desc("dateCreated"));
 		criteria.setMaxResults(1);
-
+		
 		return (PatientQueue) criteria.uniqueResult();
 	}
 	

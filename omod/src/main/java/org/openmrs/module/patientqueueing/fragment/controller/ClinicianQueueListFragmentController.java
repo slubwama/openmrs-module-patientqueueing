@@ -8,10 +8,10 @@ import org.openmrs.module.appui.UiSessionContext;
 import org.openmrs.module.patientqueueing.api.PatientQueueingService;
 import org.openmrs.module.patientqueueing.mapper.PatientQueueMapper;
 import org.openmrs.module.patientqueueing.model.PatientQueue;
-import org.openmrs.module.patientqueueing.QueueingUtils;
 import org.openmrs.ui.framework.SimpleObject;
 import org.openmrs.ui.framework.annotation.SpringBean;
 import org.openmrs.ui.framework.fragment.FragmentModel;
+import org.openmrs.util.OpenmrsUtil;
 import org.springframework.web.bind.annotation.RequestParam;
 
 import java.io.IOException;
@@ -45,25 +45,13 @@ public class ClinicianQueueListFragmentController {
 		
 		List<PatientQueue> patientQueueList = new ArrayList();
 		if (!searchfilter.equals("")) {
-			try {
-				patientQueueList = patientQueueingService.getPatientQueueList(searchfilter,
-				    QueueingUtils.changeTimeOfDate(new Date(), "00:00:00"),
-				    QueueingUtils.changeTimeOfDate(new Date(), "23:59:59"), null, null,
-				    uiSessionContext.getSessionLocation(), null, null);
-			}
-			catch (ParseException e) {
-				log.error(e);
-			}
+			patientQueueList = patientQueueingService.getPatientQueueList(searchfilter,
+			    OpenmrsUtil.firstSecondOfDay(new Date()), OpenmrsUtil.getLastMomentOfDay(new Date()), null, null,
+			    uiSessionContext.getSessionLocation(), null, null);
+			
 		} else {
-			try {
-				patientQueueList = patientQueueingService.getPatientQueueList(null,
-				    QueueingUtils.changeTimeOfDate(new Date(), "00:00:00"),
-				    QueueingUtils.changeTimeOfDate(new Date(), "23:59:59"), null, null,
-				    uiSessionContext.getSessionLocation(), null, null);
-			}
-			catch (ParseException e) {
-				log.error(e);
-			}
+			patientQueueList = patientQueueingService.getPatientQueueList(null, OpenmrsUtil.firstSecondOfDay(new Date()),
+			    OpenmrsUtil.getLastMomentOfDay(new Date()), null, null, uiSessionContext.getSessionLocation(), null, null);
 		}
 		
 		List<PatientQueueMapper> patientQueueMappers = mapPatientQueueToMapper(patientQueueList);

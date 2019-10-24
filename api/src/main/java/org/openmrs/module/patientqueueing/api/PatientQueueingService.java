@@ -29,23 +29,14 @@ import java.util.List;
 public interface PatientQueueingService extends OpenmrsService {
 	
 	/**
-	 * This method gets a patientQueue by the visitNumber
+	 * Generates a visit number based on location and date. The number generated is unique for a
+	 * patient on a given day. A patient will only have one patient visit number for a given day.
+	 * The same number will be reassigned to another queue, in-case its the same patient on the same
+	 * day.
 	 * 
-	 * @param visitNumber The visitNumber String that is used to search for a patientQueue
-	 * @return a patientQueue that matches the visitNumber passed
-	 * @throws APIException
-	 */
-	@Transactional
-	public PatientQueue getPatientQueueByVisitNumber(String visitNumber);
-	
-	/**
-	 * This Generates a visitNumber based on location and date. The Number generated is unique for a
-	 * patient on a given day A patient will only have one patientvisitNumber for a given day. The
-	 * same number will be reassigned to another queue, incase its the same patient on the same day.
-	 * 
-	 * @param location Location which will be used to first three characters of the visitNumber
-	 * @param patient the Patient who the visitNumber is for in a given queue
-	 * @return This will return a String with format LOC-dd/MM/yyy-000-1
+	 * @param location Location where the generation of the queue is initiated
+	 * @param patient the patient who the visit number is for in a given queue
+	 * @return will return a string with format LOC-dd/MM/yyy-000-1
 	 * @throws ParseException
 	 * @throws IOException
 	 */
@@ -54,8 +45,8 @@ public interface PatientQueueingService extends OpenmrsService {
 	/**
 	 * Get a single patient queue record by queueId. The queueId can not be null
 	 * 
-	 * @param queueId Id of the PatientQueue to be retrieved
-	 * @return The Patient Queue that matches the queueId
+	 * @param queueId Id of the patient queue to be retrieved
+	 * @return The patient queue that matches the queueId
 	 * @throws APIException
 	 */
 	@Transactional(readOnly = true)
@@ -99,7 +90,7 @@ public interface PatientQueueingService extends OpenmrsService {
 	public PatientQueue completePatientQueue(PatientQueue patientQueue);
 	
 	/**
-	 * This method gets the patientQueue for a patient at a given location which is not complete.
+	 * Gets the patientQueue for a patient at a given location which is not complete.
 	 * 
 	 * @param locationTo The Location where the patient was is queued to
 	 * @param patient The patient who is in the queue
@@ -107,6 +98,24 @@ public interface PatientQueueingService extends OpenmrsService {
 	 */
 	@Transactional(readOnly = true)
 	public PatientQueue getIncompletePatientQueue(Patient patient, Location locationTo);
+	
+	/**
+	 * Gets the most recent patientQueue of a patient
+	 * 
+	 * @param patient the patient whose most recent queue will be returned
+	 * @return The most recent patient queue
+	 */
+	@Transactional(readOnly = true)
+	public PatientQueue getMostRecentQueue(Patient patient);
+	
+	/**
+	 * Assigns a visit number to a patient queue
+	 * 
+	 * @param patientQueue the patient queue to be assigned a visit number
+	 * @return patient queue that has been assigned a visit number
+	 */
+	@Transactional(readOnly = true)
+	public PatientQueue assignVisitNumber(PatientQueue patientQueue);
 	
 	@Transactional(readOnly = true)
 	public List<PatientQueue> getPatientQueueList(String searchString, Date fromDate, Date toDate, Patient patient,

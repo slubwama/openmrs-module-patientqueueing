@@ -15,20 +15,18 @@ import org.openmrs.Provider;
 import org.openmrs.api.PatientService;
 import org.openmrs.api.context.Context;
 import org.openmrs.api.impl.BaseOpenmrsService;
-import org.openmrs.module.patientqueueing.QueueingUtils;
 import org.openmrs.module.patientqueueing.api.PatientQueueingService;
 import org.openmrs.module.patientqueueing.api.dao.PatientQueueingDao;
 import org.openmrs.module.patientqueueing.model.PatientQueue;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.openmrs.util.OpenmrsUtil;
 
-import java.util.*;
-
-import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Date;
+import java.util.List;
 
 public class PatientQueueingServiceImpl extends BaseOpenmrsService implements PatientQueueingService {
-	
-	private static final Logger log = LoggerFactory.getLogger(PatientQueueingServiceImpl.class);
 	
 	PatientQueueingDao dao;
 	
@@ -85,29 +83,28 @@ public class PatientQueueingServiceImpl extends BaseOpenmrsService implements Pa
 	}
 	
 	/**
-	 * This Method checks if a patient visitNumber exists
-	 * 
-	 * @param visitNumber A visitNumber in form of a string which will be check to determine if it
-	 *            exists
-	 * @return
+	 * @see org.openmrs.module.patientqueueing.api.PatientQueueingService#getMostRecentQueue(org.openmrs.Patient)
 	 */
-	private boolean isvisitNumberIdExisting(String visitNumber) {
-		
-		return getPatientQueueByVisitNumber(visitNumber) != null;
+	@Override
+	public PatientQueue getMostRecentQueue(Patient patient) {
+		return dao.getMostRecentQueue(patient);
 	}
 	
 	/**
-	 * @see org.openmrs.module.patientqueueing.api.PatientQueueingService#getPatientQueueByVisitNumber(java.lang.String)
+	 * @see org.openmrs.module.patientqueueing.api.PatientQueueingService#assignVisitNumber(org.openmrs.module.patientqueueing.model.PatientQueue)
 	 */
 	@Override
-	public PatientQueue getPatientQueueByVisitNumber(String visitNumber) {
-		List<PatientQueue> patientQueueList = dao.getPatientQueueByVisitNumber(visitNumber);
-		if (!patientQueueList.isEmpty()) {
-			return patientQueueList.get(0);
-		} else {
-			return null;
-		}
+	public PatientQueue assignVisitNumber(PatientQueue patientQueue) {
+		Date today = new Date();
+		List<PatientQueue> patientQueueList = getPatientQueueList(null, OpenmrsUtil.firstSecondOfDay(today),
+		    OpenmrsUtil.getLastMomentOfDay(today), null, null, patientQueue.getPatient(), null);
 		
+		if (!patientQueueList.isEmpty() && patientQueueList.get(0).getVisitNumber() != null) {
+			patientQueue.setVisitNumber(patientQueueList.get(0).getVisitNumber());
+		} else {
+			patientQueue.setVisitNumber(generateVisitNumber(patientQueue.getLocationFrom(), patientQueue.getPatient()));
+		}
+		return patientQueue;
 	}
 	
 	/**
@@ -116,60 +113,38 @@ public class PatientQueueingServiceImpl extends BaseOpenmrsService implements Pa
 	 */
 	public String generateVisitNumber(Location location, Patient patient) {
 		
-		Calendar fromDate = new GregorianCalendar();
-		Calendar toDate = new GregorianCalendar();
-		fromDate.set(Calendar.HOUR_OF_DAY, 0);
-		fromDate.set(Calendar.MINUTE, 0);
-		fromDate.set(Calendar.SECOND, 0);
+		Date today = new Date();
 		
-		toDate.set(Calendar.HOUR_OF_DAY, 23);
-		toDate.set(Calendar.MINUTE, 59);
-		toDate.set(Calendar.SECOND, 59);
+		SimpleDateFormat formatterExt = new SimpleDateFormat(Context.getAdministrationService().getGlobalProperty(
+		    "patientqueueing.defaultDateFormat"));
 		
-		Date newFromDate = fromDate.getTime();
-		Date newToDate = toDate.getTime();
+		List<PatientQueue> patientQueues = getPatientQueueList(null, OpenmrsUtil.firstSecondOfDay(today),
+		    OpenmrsUtil.getLastMomentOfDay(today), null, location, null, null);
 		
-		List<PatientQueue> patientQueueList = new ArrayList<PatientQueue>();
-		
-		try {
-			patientQueueList = getPatientQueueList(null, QueueingUtils.changeTimeOfDate(newFromDate, "00:00:00"),
-			    QueueingUtils.changeTimeOfDate(newToDate, "23:59:59"), null, location, patient, null);
-		}
-		catch (ParseException e) {
-			log.error("", e);
+		int nextNumberInQueue = 1;
+		if (!patientQueues.isEmpty()) {
+			String currentVisitNumber = patientQueues.get(0).getVisitNumber();
+			nextNumberInQueue = Integer.parseInt(String.valueOf(currentVisitNumber.subSequence(currentVisitNumber.length(),
+			    -3)));
 		}
 		
-		if (!patientQueueList.isEmpty() && patientQueueList.get(0).getVisitNumber() != null) {
-			return patientQueueList.get(0).getVisitNumber();
-		} else {
-			
-			String dateString = QueueingUtils.formatDateAsString(newToDate, null);
-			
-			String letter = location.getName();
-			
-			if (letter.length() > 3) {
-				letter = letter.substring(0, 3);
-			}
-			
-			String defaultvisitNumber;
-			
-			int id = 0;
-			do {
-				++id;
-				String appendZeroes;
-				
-				if (id <= 9) {
-					appendZeroes = "00";
-				} else if (id < 100) {
-					appendZeroes = "0";
-				} else
-					appendZeroes = "";
-				
-				defaultvisitNumber = dateString + "-" + letter + "-" + appendZeroes + id;
-			} while (isvisitNumberIdExisting(defaultvisitNumber));
-			
-			return defaultvisitNumber;
+		String dateString = formatterExt.format(today);
+		
+		String locationName = location.getName();
+		
+		if (locationName.length() > 3) {
+			locationName = locationName.substring(0, 3);
 		}
+		
+		String zeroesToAppend;
+		if (nextNumberInQueue <= 9) {
+			zeroesToAppend = "00";
+		} else if (nextNumberInQueue < 100) {
+			zeroesToAppend = "0";
+		} else
+			zeroesToAppend = "";
+		
+		return dateString + "-" + locationName + "-" + zeroesToAppend + nextNumberInQueue;
 	}
 	
 	@Override
