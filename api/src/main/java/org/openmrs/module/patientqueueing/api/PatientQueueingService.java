@@ -115,9 +115,9 @@ public interface PatientQueueingService extends OpenmrsService {
 	 * @return patient queue that has been assigned a visit number
 	 */
 	@Transactional(readOnly = true)
-	public PatientQueue assignVisitNumber(PatientQueue patientQueue);
+	public PatientQueue assignVisitNumberForToday(PatientQueue patientQueue);
 	
 	@Transactional(readOnly = true)
-	public List<PatientQueue> getPatientQueueList(String searchString, Date fromDate, Date toDate, Patient patient,
-	        Provider provider, Location locationTo, Location locationFrom, String status);
+	public List<PatientQueue> getPatientQueueListBySearchString(String searchString, Date fromDate, Date toDate,
+	        Patient patient, Provider provider, Location locationTo, Location locationFrom, PatientQueue.Status status);
 }

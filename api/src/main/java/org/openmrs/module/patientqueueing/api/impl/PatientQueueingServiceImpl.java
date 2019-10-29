@@ -40,7 +40,7 @@ public class PatientQueueingServiceImpl extends BaseOpenmrsService implements Pa
 	public PatientQueue savePatientQue(PatientQueue patientQueue) {
 		PatientQueue currentQueue = dao.getIncompletePatientQueue(patientQueue.getPatient(), patientQueue.getLocationTo());
 		
-		if (currentQueue != null) {
+		if (currentQueue != null && !patientQueue.equals(currentQueue)) {
 			completePatientQueue(currentQueue);
 		}
 		
@@ -94,7 +94,7 @@ public class PatientQueueingServiceImpl extends BaseOpenmrsService implements Pa
 	 * @see org.openmrs.module.patientqueueing.api.PatientQueueingService#assignVisitNumber(org.openmrs.module.patientqueueing.model.PatientQueue)
 	 */
 	@Override
-	public PatientQueue assignVisitNumber(PatientQueue patientQueue) {
+	public PatientQueue assignVisitNumberForToday(PatientQueue patientQueue) {
 		Date today = new Date();
 		List<PatientQueue> patientQueueList = getPatientQueueList(null, OpenmrsUtil.firstSecondOfDay(today),
 		    OpenmrsUtil.getLastMomentOfDay(today), null, null, patientQueue.getPatient(), null);
@@ -115,17 +115,16 @@ public class PatientQueueingServiceImpl extends BaseOpenmrsService implements Pa
 		
 		Date today = new Date();
 		
-		SimpleDateFormat formatterExt = new SimpleDateFormat(Context.getAdministrationService().getGlobalProperty(
-		    "patientqueueing.defaultDateFormat"));
+		SimpleDateFormat formatterExt = new SimpleDateFormat("dd/MM/yyyy");
 		
 		List<PatientQueue> patientQueues = getPatientQueueList(null, OpenmrsUtil.firstSecondOfDay(today),
 		    OpenmrsUtil.getLastMomentOfDay(today), null, location, null, null);
 		
 		int nextNumberInQueue = 1;
 		if (!patientQueues.isEmpty()) {
-			String currentVisitNumber = patientQueues.get(0).getVisitNumber();
-			nextNumberInQueue = Integer.parseInt(String.valueOf(currentVisitNumber.subSequence(currentVisitNumber.length(),
-			    -3)));
+			nextNumberInQueue = Integer.parseInt(patientQueues.get(0).getVisitNumber()
+			        .subSequence(15, patientQueues.get(0).getVisitNumber().length()).toString());
+			nextNumberInQueue += 1;
 		}
 		
 		String dateString = formatterExt.format(today);
@@ -136,34 +135,35 @@ public class PatientQueueingServiceImpl extends BaseOpenmrsService implements Pa
 			locationName = locationName.substring(0, 3);
 		}
 		
-		String zeroesToAppend;
+		String zeroesToAppend = "";
 		if (nextNumberInQueue <= 9) {
 			zeroesToAppend = "00";
 		} else if (nextNumberInQueue < 100) {
 			zeroesToAppend = "0";
-		} else
-			zeroesToAppend = "";
+		}
 		
 		return dateString + "-" + locationName + "-" + zeroesToAppend + nextNumberInQueue;
 	}
 	
 	@Override
-	public List<PatientQueue> getPatientQueueList(String searchString, Date fromDate, Date toDate, Patient patient,
-	        Provider provider, Location locationTo, Location locationFrom, String status) {
+	public List<PatientQueue> getPatientQueueListBySearchString(String searchString, Date fromDate, Date toDate,
+	        Patient patient, Provider provider, Location locationTo, Location locationFrom, PatientQueue.Status status) {
 		return dao.getPatientQueueList(processPatientSearchString(searchString), fromDate, toDate, patient, provider,
 		    locationTo, locationFrom, status);
 	}
 	
 	private List<Patient> processPatientSearchString(String searchString) {
-		PatientService patientService = Context.getPatientService();
-		
-		List list = Arrays.asList(searchString.split(" "));
 		
 		List<Patient> patientList = new ArrayList<Patient>();
-		
-		for (Object o : list) {
-			List<Patient> patients = patientService.getPatients(o.toString());
-			patientList.addAll(patients);
+		if (searchString != null) {
+			PatientService patientService = Context.getPatientService();
+			
+			List list = Arrays.asList(searchString.split(" "));
+			
+			for (Object o : list) {
+				List<Patient> patients = patientService.getPatients(o.toString());
+				patientList.addAll(patients);
+			}
 		}
 		return patientList;
 	}

@@ -138,7 +138,7 @@ public class PatientQueueingDao {
 	}
 	
 	public List<PatientQueue> getPatientQueueList(List<Patient> patientList, Date fromDate, Date toDate, Patient patient,
-	        Provider provider, Location locationTo, Location locationFrom, String status) {
+	        Provider provider, Location locationTo, Location locationFrom, PatientQueue.Status status) {
 		Criteria criteria = getSession().createCriteria(PatientQueue.class);
 		
 		if (!patientList.isEmpty()) {

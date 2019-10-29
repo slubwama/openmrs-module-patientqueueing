@@ -199,7 +199,7 @@ public class PatientQueueingServiceTest extends BaseModuleContextSensitiveTest {
 		patientQueue.setLocationTo(location);
 		patientQueue.setPriority(0);
 		patientQueue.setPriorityComment("Emergency");
-		patientQueueingService.assignVisitNumber(patientQueue);
+		patientQueueingService.assignVisitNumberForToday(patientQueue);
 		
 		String newQueueNumber = patientQueueingService.generateVisitNumber(location, patient);
 		
@@ -226,7 +226,7 @@ public class PatientQueueingServiceTest extends BaseModuleContextSensitiveTest {
 		patientQueue.setLocationTo(location);
 		patientQueue.setPriority(0);
 		patientQueue.setPriorityComment("Emergency");
-		patientQueueingService.assignVisitNumber(patientQueue);
+		patientQueueingService.assignVisitNumberForToday(patientQueue);
 		
 		PatientQueue patientQueue2 = new PatientQueue();
 		patientQueue2.setPatient(patient);
@@ -236,7 +236,7 @@ public class PatientQueueingServiceTest extends BaseModuleContextSensitiveTest {
 		patientQueue2.setLocationTo(location);
 		patientQueue2.setPriority(0);
 		patientQueue2.setPriorityComment("Emergency");
-		patientQueueingService.assignVisitNumber(patientQueue2);
+		patientQueueingService.assignVisitNumberForToday(patientQueue2);
 		patientQueueingService.savePatientQue(patientQueue2);
 		
 		Assert.assertEquals(patientQueue.getVisitNumber(), patientQueue2.getVisitNumber());

@@ -45,13 +45,14 @@ public class ClinicianQueueListFragmentController {
 		
 		List<PatientQueue> patientQueueList = new ArrayList();
 		if (!searchfilter.equals("")) {
-			patientQueueList = patientQueueingService.getPatientQueueList(searchfilter,
+			patientQueueList = patientQueueingService.getPatientQueueListBySearchString(searchfilter,
 			    OpenmrsUtil.firstSecondOfDay(new Date()), OpenmrsUtil.getLastMomentOfDay(new Date()), null, null,
 			    uiSessionContext.getSessionLocation(), null, null);
 			
 		} else {
-			patientQueueList = patientQueueingService.getPatientQueueList(null, OpenmrsUtil.firstSecondOfDay(new Date()),
-			    OpenmrsUtil.getLastMomentOfDay(new Date()), null, null, uiSessionContext.getSessionLocation(), null, null);
+			patientQueueList = patientQueueingService.getPatientQueueListBySearchString(null,
+			    OpenmrsUtil.firstSecondOfDay(new Date()), OpenmrsUtil.getLastMomentOfDay(new Date()), null, null,
+			    uiSessionContext.getSessionLocation(), null, null);
 		}
 		
 		List<PatientQueueMapper> patientQueueMappers = mapPatientQueueToMapper(patientQueueList);
