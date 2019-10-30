@@ -54,10 +54,9 @@ public class SendPatientToQueueFragmentController {
 		patientQueue.setLocationTo(location);
 		patientQueue.setProvider(provider);
 		patientQueue.setStatus(PatientQueue.Status.PENDING);
-		patientQueue.setVisitNumber(patientQueueingService.generateVisitNumber(location, patient));
 		patientQueue.setCreator(uiSessionContext.getCurrentUser());
 		patientQueue.setDateCreated(new Date());
-		
+		patientQueueingService.assignVisitNumberForToday(patientQueue);
 		patientQueueingService.savePatientQue(patientQueue);
 		
 		SimpleObject simpleObject = new SimpleObject();

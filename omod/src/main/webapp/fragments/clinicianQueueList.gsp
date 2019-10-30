@@ -1,4 +1,4 @@
-<% if (clinicianLocation?.contains(currentLocation?.uuid)) { %>
+<% if (clinicianLocationUUIDList?.contains(currentLocation?.uuid)) { %>
 <%
         ui.includeCss("coreapps", "patientsearch/patientSearchWidget.css")
 %>

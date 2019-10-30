@@ -30,6 +30,10 @@ public class PatientQueueingServiceImpl extends BaseOpenmrsService implements Pa
 	
 	PatientQueueingDao dao;
 	
+	private static final int VISIT_NUMBER_INTEGER_START_POSITION = 15;
+	
+	private static final int INTEGER_IN_VISIT_NUMBER_LENGTH = 3;
+	
 	public void setDao(PatientQueueingDao dao) {
 		this.dao = dao;
 	}
@@ -91,7 +95,7 @@ public class PatientQueueingServiceImpl extends BaseOpenmrsService implements Pa
 	}
 	
 	/**
-	 * @see org.openmrs.module.patientqueueing.api.PatientQueueingService#assignVisitNumber(org.openmrs.module.patientqueueing.model.PatientQueue)
+	 * @see org.openmrs.module.patientqueueing.api.PatientQueueingService#assignVisitNumberForToday(org.openmrs.module.patientqueueing.model.PatientQueue)
 	 */
 	@Override
 	public PatientQueue assignVisitNumberForToday(PatientQueue patientQueue) {
@@ -122,9 +126,14 @@ public class PatientQueueingServiceImpl extends BaseOpenmrsService implements Pa
 		
 		int nextNumberInQueue = 1;
 		if (!patientQueues.isEmpty()) {
-			nextNumberInQueue = Integer.parseInt(patientQueues.get(0).getVisitNumber()
-			        .subSequence(15, patientQueues.get(0).getVisitNumber().length()).toString());
-			nextNumberInQueue += 1;
+			
+			int visitNumberLength = patientQueues.get(0).getVisitNumber().length();
+			
+			if (visitNumberLength == VISIT_NUMBER_INTEGER_START_POSITION + INTEGER_IN_VISIT_NUMBER_LENGTH) {
+				nextNumberInQueue = Integer.parseInt(patientQueues.get(0).getVisitNumber()
+				        .subSequence(VISIT_NUMBER_INTEGER_START_POSITION, visitNumberLength).toString());
+				nextNumberInQueue += 1;
+			}
 		}
 		
 		String dateString = formatterExt.format(today);
@@ -145,14 +154,28 @@ public class PatientQueueingServiceImpl extends BaseOpenmrsService implements Pa
 		return dateString + "-" + locationName + "-" + zeroesToAppend + nextNumberInQueue;
 	}
 	
+	/**
+	 * @see org.openmrs.module.patientqueueing.api.PatientQueueingService#getPatientQueueListBySearchParams(java.lang.String,
+	 *      java.util.Date, java.util.Date, org.openmrs.Location, org.openmrs.Location,
+	 *      org.openmrs.module.patientqueueing.model.PatientQueue.Status)
+	 */
 	@Override
-	public List<PatientQueue> getPatientQueueListBySearchString(String searchString, Date fromDate, Date toDate,
-	        Patient patient, Provider provider, Location locationTo, Location locationFrom, PatientQueue.Status status) {
-		return dao.getPatientQueueList(processPatientSearchString(searchString), fromDate, toDate, patient, provider,
-		    locationTo, locationFrom, status);
+	public List<PatientQueue> getPatientQueueListBySearchParams(String searchString, Date fromDate, Date toDate,
+	        Location locationTo, Location locationFrom, PatientQueue.Status status) {
+		if (fromDate == null || toDate == null) {
+			fromDate = OpenmrsUtil.firstSecondOfDay(new Date());
+			toDate = OpenmrsUtil.getLastMomentOfDay(new Date());
+		}
+		return dao.getPatientQueueList(getPatientByNames(searchString), fromDate, toDate, locationTo, locationFrom, status);
 	}
 	
-	private List<Patient> processPatientSearchString(String searchString) {
+	/**
+	 * Get list of patients that match search string
+	 * 
+	 * @param searchString This is the search string that will be used to get patients in a list
+	 * @return List of patients that match the search criteria
+	 */
+	private List<Patient> getPatientByNames(String searchString) {
 		
 		List<Patient> patientList = new ArrayList<Patient>();
 		if (searchString != null) {
@@ -167,5 +190,4 @@ public class PatientQueueingServiceImpl extends BaseOpenmrsService implements Pa
 		}
 		return patientList;
 	}
-	
 }
