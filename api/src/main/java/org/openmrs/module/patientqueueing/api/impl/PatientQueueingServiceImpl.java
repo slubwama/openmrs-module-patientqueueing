@@ -29,9 +29,8 @@ import java.util.List;
 public class PatientQueueingServiceImpl extends BaseOpenmrsService implements PatientQueueingService {
 	
 	PatientQueueingDao dao;
-	
+
 	private static final int VISIT_NUMBER_INTEGER_START_POSITION = 15;
-	
 	private static final int INTEGER_IN_VISIT_NUMBER_LENGTH = 3;
 	
 	public void setDao(PatientQueueingDao dao) {
@@ -44,7 +43,7 @@ public class PatientQueueingServiceImpl extends BaseOpenmrsService implements Pa
 	public PatientQueue savePatientQue(PatientQueue patientQueue) {
 		PatientQueue currentQueue = dao.getIncompletePatientQueue(patientQueue.getPatient(), patientQueue.getLocationTo());
 		
-		if (currentQueue != null && !patientQueue.equals(currentQueue)) {
+		if (currentQueue != null) {
 			completePatientQueue(currentQueue);
 		}
 		
@@ -123,15 +122,15 @@ public class PatientQueueingServiceImpl extends BaseOpenmrsService implements Pa
 		
 		List<PatientQueue> patientQueues = getPatientQueueList(null, OpenmrsUtil.firstSecondOfDay(today),
 		    OpenmrsUtil.getLastMomentOfDay(today), null, location, null, null);
-		
+
 		int nextNumberInQueue = 1;
 		if (!patientQueues.isEmpty()) {
-			
+
 			int visitNumberLength = patientQueues.get(0).getVisitNumber().length();
-			
+
 			if (visitNumberLength == VISIT_NUMBER_INTEGER_START_POSITION + INTEGER_IN_VISIT_NUMBER_LENGTH) {
 				nextNumberInQueue = Integer.parseInt(patientQueues.get(0).getVisitNumber()
-				        .subSequence(VISIT_NUMBER_INTEGER_START_POSITION, visitNumberLength).toString());
+						.subSequence(VISIT_NUMBER_INTEGER_START_POSITION, visitNumberLength).toString());
 				nextNumberInQueue += 1;
 			}
 		}

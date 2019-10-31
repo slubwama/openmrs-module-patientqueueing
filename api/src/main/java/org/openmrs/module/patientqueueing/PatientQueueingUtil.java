@@ -14,11 +14,8 @@ import java.util.List;
 
 public class PatientQueueingUtil {
 	
-	public PatientQueueingUtil() {
-	}
-	
 	/**
-	 * Converts a delimited string to a list
+	 * Converts a delimited string by the delimiter parameter set to a list
 	 * 
 	 * @param delimitedString The string that contains items to be split
 	 * @param delimiter the separator that will be used to split the sting into objects
