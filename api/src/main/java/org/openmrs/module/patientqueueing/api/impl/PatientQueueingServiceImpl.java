@@ -190,4 +190,5 @@ public class PatientQueueingServiceImpl extends BaseOpenmrsService implements Pa
 		}
 		return patientList;
 	}
+	
 }
