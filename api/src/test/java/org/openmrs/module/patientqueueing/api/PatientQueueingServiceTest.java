@@ -22,6 +22,7 @@ import org.openmrs.module.patientqueueing.api.dao.PatientQueueingDao;
 import org.openmrs.module.patientqueueing.api.impl.PatientQueueingServiceImpl;
 import org.openmrs.module.patientqueueing.model.PatientQueue;
 import org.openmrs.test.BaseModuleContextSensitiveTest;
+import org.openmrs.util.OpenmrsUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -314,7 +315,29 @@ public class PatientQueueingServiceTest extends BaseModuleContextSensitiveTest {
 	}
 	
 	@Test
-	public void getPatientQueueListBySearchParams_shouldReturnNotReturnAnyPatientQueueForSearchStringProvidedWithExistingPatient()
+	public void getPatientQueueListBySearchParams_shouldReturnPatientQueuesThatMatchesParameters() throws Exception {
+		
+		PatientQueueingService patientQueueingService = Context.getService(PatientQueueingService.class);
+		
+		String dateCreated = "2019-10-07 19:08:26";
+		
+		Date date = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").parse(dateCreated);
+		
+		Patient patient = Context.getPatientService().getPatient(10000);
+		
+		List<PatientQueue> patientQueueList = patientQueueingService.getPatientQueueListBySearchParams("Mukasa",
+		    OpenmrsUtil.firstSecondOfDay(date), OpenmrsUtil.getLastMomentOfDay(date), null, null,
+		    PatientQueue.Status.PENDING);
+		
+		Assert.assertEquals(1, patientQueueList.size());
+		
+		Assert.assertEquals(patient, patientQueueList.get(0).getPatient());
+		
+		Assert.assertEquals("Mukasa", patientQueueList.get(0).getPatient().getFamilyName());
+	}
+	
+	@Test
+	public void getPatientQueueListBySearchParams_shouldReturnNotReturnPatientQueuesThatDontMatchParameters()
 	        throws Exception {
 		
 		PatientQueueingService patientQueueingService = Context.getService(PatientQueueingService.class);
@@ -327,19 +350,6 @@ public class PatientQueueingServiceTest extends BaseModuleContextSensitiveTest {
 		
 		List<PatientQueue> patientQueueList = patientQueueingService.getPatientQueueListBySearchParams("Anet", null, null,
 		    null, location, null);
-		
-		Assert.assertEquals(0, patientQueueList.size());
-		
-	}
-	
-	@Test
-	public void getPatientQueueListBySearchParams_shouldReturnNotReturnAnyPatientQueueForSearchStringWithOutExistingPatient()
-	        throws Exception {
-		
-		PatientQueueingService patientQueueingService = Context.getService(PatientQueueingService.class);
-		
-		List<PatientQueue> patientQueueList = patientQueueingService.getPatientQueueListBySearchParams("Pan Sarah", null,
-		    null, null, null, null);
 		
 		Assert.assertEquals(0, patientQueueList.size());
 		

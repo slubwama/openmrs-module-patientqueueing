@@ -12,8 +12,8 @@ package org.openmrs.module.patientqueueing.api.impl;
 import org.openmrs.Location;
 import org.openmrs.Patient;
 import org.openmrs.Provider;
-import org.openmrs.api.PatientService;
 import org.openmrs.api.context.Context;
+import org.openmrs.api.PatientService;
 import org.openmrs.api.impl.BaseOpenmrsService;
 import org.openmrs.module.patientqueueing.api.PatientQueueingService;
 import org.openmrs.module.patientqueueing.api.dao.PatientQueueingDao;
@@ -162,33 +162,18 @@ public class PatientQueueingServiceImpl extends BaseOpenmrsService implements Pa
 	@Override
 	public List<PatientQueue> getPatientQueueListBySearchParams(String searchString, Date fromDate, Date toDate,
 	        Location locationTo, Location locationFrom, PatientQueue.Status status) {
-		if (fromDate == null || toDate == null) {
-			fromDate = OpenmrsUtil.firstSecondOfDay(new Date());
-			toDate = OpenmrsUtil.getLastMomentOfDay(new Date());
-		}
-		return dao.getPatientQueueList(getPatientByNames(searchString), fromDate, toDate, locationTo, locationFrom, status);
-	}
-	
-	/**
-	 * Get list of patients that match search string
-	 * 
-	 * @param searchString This is the search string that will be used to get patients in a list
-	 * @return List of patients that match the search criteria
-	 */
-	private List<Patient> getPatientByNames(String searchString) {
 		
 		List<Patient> patientList = new ArrayList<Patient>();
+		
 		if (searchString != null) {
 			PatientService patientService = Context.getPatientService();
-			
-			List list = Arrays.asList(searchString.split(" "));
-			
+			List list = Arrays.asList(searchString.split(","));
 			for (Object o : list) {
 				List<Patient> patients = patientService.getPatients(o.toString());
 				patientList.addAll(patients);
 			}
 		}
-		return patientList;
+		
+		return dao.getPatientQueueList(patientList, fromDate, toDate, locationTo, locationFrom, status);
 	}
-	
 }
