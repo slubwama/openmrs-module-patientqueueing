@@ -107,7 +107,7 @@ public class PatientQueueingDao {
 			criteria.add(Restrictions.eq("patient", patient));
 		}
 		
-		criteria.add(Restrictions.ne("status", PatientQueue.Status.COMPLETED));
+		criteria.add(Restrictions.ne("status",PatientQueue.Status.COMPLETED));
 		
 		return (PatientQueue) criteria.uniqueResult();
 	}
@@ -124,14 +124,11 @@ public class PatientQueueingDao {
 		
 		return (PatientQueue) criteria.uniqueResult();
 	}
-	
+
 	/**
-	 * @see org.openmrs.module.patientqueueing.api.PatientQueueingService#getPatientQueueListBySearchParams(java.lang.String,
-	 *      java.util.Date, java.util.Date, org.openmrs.Location, org.openmrs.Location,
-	 *      org.openmrs.module.patientqueueing.model.PatientQueue.Status)
+	 * @see org.openmrs.module.patientqueueing.api.PatientQueueingService#getPatientQueueListBySearchParams(java.lang.String, java.util.Date, java.util.Date, org.openmrs.Location, org.openmrs.Location, org.openmrs.module.patientqueueing.model.PatientQueue.Status)
 	 */
-	public List<PatientQueue> getPatientQueueList(List<Patient> patientList, Date fromDate, Date toDate,
-	        Location locationTo, Location locationFrom, PatientQueue.Status status) {
+	public List<PatientQueue> getPatientQueueList(List<Patient> patientList, Date fromDate, Date toDate, Location locationTo, Location locationFrom, PatientQueue.Status status) {
 		Criteria criteria = getSession().createCriteria(PatientQueue.class);
 		
 		if (!patientList.isEmpty()) {
@@ -141,7 +138,7 @@ public class PatientQueueingDao {
 		if (fromDate != null && toDate != null) {
 			criteria.add(Restrictions.between("dateCreated", fromDate, toDate));
 		}
-		
+
 		if (locationTo != null) {
 			criteria.add(Restrictions.eq("locationTo", locationTo));
 		}
