@@ -23,7 +23,7 @@ import org.openmrs.module.webservices.rest.web.resource.impl.BaseDelegatingResou
 public class PatientQueueTest extends BaseDelegatingResourceTest<PatientQueueResource, PatientQueue> {
 	
 	/**
-	 * @see org.openmrs.module.webservices.rest.web.resource.impl.BaseDelegatingResourceTest#newObject()
+	 * @see BaseDelegatingResourceTest#newObject()
 	 */
 	@Override
 	public PatientQueue newObject() {
@@ -31,7 +31,7 @@ public class PatientQueueTest extends BaseDelegatingResourceTest<PatientQueueRes
 	}
 	
 	/**
-	 * @see org.openmrs.module.webservices.rest.web.resource.impl.BaseDelegatingResourceTest#validateDefaultRepresentation()
+	 * @see BaseDelegatingResourceTest#validateDefaultRepresentation()
 	 */
 	@Override
 	public void validateDefaultRepresentation() throws Exception {
@@ -44,7 +44,7 @@ public class PatientQueueTest extends BaseDelegatingResourceTest<PatientQueueRes
 	}
 	
 	/**
-	 * @see org.openmrs.module.webservices.rest.web.resource.impl.BaseDelegatingResourceTest#validateFullRepresentation()
+	 * @see BaseDelegatingResourceTest#validateFullRepresentation()
 	 */
 	@Override
 	public void validateFullRepresentation() throws Exception {
@@ -71,7 +71,7 @@ public class PatientQueueTest extends BaseDelegatingResourceTest<PatientQueueRes
 	}
 	
 	/**
-	 * @see org.openmrs.module.webservices.rest.web.resource.impl.BaseDelegatingResourceTest#getDisplayProperty()
+	 * @see BaseDelegatingResourceTest#getDisplayProperty()
 	 */
 	@Override
 	public String getDisplayProperty() {
@@ -79,7 +79,7 @@ public class PatientQueueTest extends BaseDelegatingResourceTest<PatientQueueRes
 	}
 	
 	/**
-	 * @see org.openmrs.module.webservices.rest.web.resource.impl.BaseDelegatingResourceTest#getUuidProperty()
+	 * @see BaseDelegatingResourceTest#getUuidProperty()
 	 */
 	@Override
 	public String getUuidProperty() {

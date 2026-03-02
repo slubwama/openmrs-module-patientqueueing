@@ -18,6 +18,7 @@ import org.openmrs.Provider;
 import org.openmrs.api.db.hibernate.DbSession;
 import org.openmrs.api.db.hibernate.DbSessionFactory;
 import org.openmrs.module.patientqueueing.model.PatientQueue;
+import org.openmrs.module.patientqueueing.model.PatientQueueEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -40,7 +41,7 @@ public class PatientQueueingDao {
 	}
 	
 	/**
-	 * @see org.openmrs.module.patientqueueing.api.PatientQueueingService#getPatientQueueById(java.lang.Integer)
+	 * @see org.openmrs.module.patientqueueing.api.PatientQueueingService#getPatientQueueById(Integer)
 	 */
 	public PatientQueue getPatientQueueById(Integer queueId) {
 		return (PatientQueue) getSession().createCriteria(PatientQueue.class)
@@ -48,7 +49,7 @@ public class PatientQueueingDao {
 	}
 	
 	/**
-	 * @see org.openmrs.module.patientqueueing.api.PatientQueueingService#getPatientQueueByUuid(java.lang.String)
+	 * @see org.openmrs.module.patientqueueing.api.PatientQueueingService#getPatientQueueByUuid(String)
 	 */
 	public PatientQueue getPatientQueueByUUID(String uuid) {
 		return (PatientQueue) getSession().createCriteria(PatientQueue.class).add(Restrictions.eq("uuid", uuid))
@@ -56,9 +57,8 @@ public class PatientQueueingDao {
 	}
 	
 	/**
-	 * @see org.openmrs.module.patientqueueing.api.PatientQueueingService#getPatientQueueList(org.openmrs.Provider,
-	 *      java.util.Date, java.util.Date, org.openmrs.Location, org.openmrs.Location,
-	 *      org.openmrs.Patient, org.openmrs.module.patientqueueing.model.PatientQueue.Status)
+	 * @see org.openmrs.module.patientqueueing.api.PatientQueueingService#getPatientQueueList(Provider,
+	 *      Date, Date, Location, Location, Patient, PatientQueue.Status)
 	 */
 	public List<PatientQueue> getPatientQueueList(Provider provider, Date fromDate, Date toDate, Location locationTo,
 	        Location locationFrom, Patient patient, PatientQueue.Status status, Location queueRoom) {
@@ -92,22 +92,28 @@ public class PatientQueueingDao {
 			criteria.add(Restrictions.eq("queueRoom", queueRoom));
 		}
 		
-		criteria.addOrder(Order.desc("dateCreated"));
+		// Queue ordering should be FIFO by default for fairness
+		criteria.addOrder(Order.asc("dateCreated"));
 		
 		return criteria.list();
 	}
 	
 	/**
-	 * @see org.openmrs.module.patientqueueing.api.PatientQueueingService#savePatientQue(org.openmrs.module.patientqueueing.model.PatientQueue)
+	 * @see org.openmrs.module.patientqueueing.api.PatientQueueingService#savePatientQue(PatientQueue)
 	 */
 	public PatientQueue savePatientQueue(PatientQueue patientQueue) {
 		sessionFactory.getCurrentSession().saveOrUpdate(patientQueue);
 		return patientQueue;
 	}
 	
+	public PatientQueueEvent savePatientQueueEvent(PatientQueueEvent event) {
+		sessionFactory.getCurrentSession().saveOrUpdate(event);
+		return event;
+	}
+	
 	/**
-	 * @see org.openmrs.module.patientqueueing.api.PatientQueueingService#getIncompletePatientQueue(org.openmrs.Patient,
-	 *      org.openmrs.Location)
+	 * @see org.openmrs.module.patientqueueing.api.PatientQueueingService#getIncompletePatientQueue(Patient,
+	 *      Location)
 	 */
 	public PatientQueue getIncompletePatientQueue(Patient patient, Location locationTo, Location queueRoom) {
 		Criteria criteria = getSession().createCriteria(PatientQueue.class);
@@ -130,7 +136,7 @@ public class PatientQueueingDao {
 	}
 	
 	/**
-	 * @see org.openmrs.module.patientqueueing.api.PatientQueueingService#getMostRecentQueue(org.openmrs.Patient)
+	 * @see org.openmrs.module.patientqueueing.api.PatientQueueingService#getMostRecentQueue(Patient)
 	 */
 	public PatientQueue getMostRecentQueue(Patient patient) {
 		Criteria criteria = getSession().createCriteria(PatientQueue.class);
@@ -143,9 +149,8 @@ public class PatientQueueingDao {
 	}
 	
 	/**
-	 * @see org.openmrs.module.patientqueueing.api.PatientQueueingService#getPatientQueueListBySearchParams(java.lang.String,
-	 *      java.util.Date, java.util.Date, org.openmrs.Location, org.openmrs.Location,
-	 *      org.openmrs.module.patientqueueing.model.PatientQueue.Status)
+	 * @see org.openmrs.module.patientqueueing.api.PatientQueueingService#getPatientQueueListBySearchParams(String,
+	 *      Date, Date, Location, Location, PatientQueue.Status)
 	 */
 	
 	public List<PatientQueue> getPatientQueueList(List<Patient> patientList, Date fromDate, Date toDate,
@@ -176,7 +181,8 @@ public class PatientQueueingDao {
 			criteria.add(Restrictions.eq("queueRoom", queueRoom));
 		}
 		
-		criteria.addOrder(Order.desc("dateCreated"));
+		// Queue ordering should be FIFO by default for fairness
+		criteria.addOrder(Order.asc("dateCreated"));
 		
 		return criteria.list();
 	}
@@ -187,7 +193,8 @@ public class PatientQueueingDao {
 	 *      org.openmrs.module.patientqueueing.model.PatientQueue.Status,java.util.Date dateFrom,
 	 *      java.util.Date)
 	 */
-	public List<PatientQueue> getPatientsInQueueRoom(List<Location> queueRooms, PatientQueue.Status status, Date fromDate, Date toDate) {
+	public List<PatientQueue> getPatientsInQueueRoom(List<Location> queueRooms, PatientQueue.Status status, Date fromDate,
+	        Date toDate) {
 		Criteria criteria = getSession().createCriteria(PatientQueue.class);
 		
 		if (fromDate != null && toDate != null) {
@@ -202,7 +209,24 @@ public class PatientQueueingDao {
 			criteria.add(Restrictions.in("queueRoom", queueRooms));
 		}
 		
-		criteria.addOrder(Order.desc("dateCreated"));
+		// Queue ordering should be FIFO by default for fairness
+		criteria.addOrder(Order.asc("dateCreated"));
 		return criteria.list();
+	}
+	
+	/**
+	 * Find a queue entry by its ticket number (or legacy visit number) within a date range.
+	 */
+	public PatientQueue getPatientQueueByTicketNumber(String ticketNumberOrVisitNumber, Date fromDate, Date toDate) {
+		Criteria criteria = getSession().createCriteria(PatientQueue.class);
+		if (fromDate != null && toDate != null) {
+			criteria.add(Restrictions.between("dateCreated", fromDate, toDate));
+		}
+		criteria.add(Restrictions.or(Restrictions.eq("ticketNumber", ticketNumberOrVisitNumber),
+		    Restrictions.eq("visitNumber", ticketNumberOrVisitNumber)));
+		criteria.add(Restrictions.ne("status", PatientQueue.Status.CANCELLED));
+		criteria.setMaxResults(1);
+		criteria.addOrder(Order.desc("dateCreated"));
+		return (PatientQueue) criteria.uniqueResult();
 	}
 }

@@ -30,7 +30,7 @@ public class PatientQueueControllerTest extends MainResourceControllerTest {
 	}
 	
 	/**
-	 * @see org.openmrs.module.webservices.rest.web.v1_0.controller.MainResourceControllerTest#getURI()
+	 * @see MainResourceControllerTest#getURI()
 	 */
 	@Override
 	public String getURI() {
@@ -38,7 +38,7 @@ public class PatientQueueControllerTest extends MainResourceControllerTest {
 	}
 	
 	/**
-	 * @see org.openmrs.module.webservices.rest.web.v1_0.controller.MainResourceControllerTest#getUuid()
+	 * @see MainResourceControllerTest#getUuid()
 	 */
 	@Override
 	public String getUuid() {
@@ -46,7 +46,7 @@ public class PatientQueueControllerTest extends MainResourceControllerTest {
 	}
 	
 	/**
-	 * @see org.openmrs.module.webservices.rest.web.v1_0.controller.MainResourceControllerTest#getAllCount()
+	 * @see MainResourceControllerTest#getAllCount()
 	 */
 	@Override
 	public long getAllCount() {
