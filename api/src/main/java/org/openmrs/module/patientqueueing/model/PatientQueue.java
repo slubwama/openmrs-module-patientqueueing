@@ -50,7 +50,7 @@ public class PatientQueue extends BaseOpenmrsData implements Serializable {
 	
 	@Column(name = "status", length = 255)
 	@Enumerated(EnumType.STRING)
-	private PatientQueue.Status status;
+	private Status status;
 	
 	@Column(name = "visit_number", length = 255)
 	private String visitNumber;
@@ -67,16 +67,58 @@ public class PatientQueue extends BaseOpenmrsData implements Serializable {
 	@ManyToOne
 	@JoinColumn(name = "queue_room")
 	private Location queueRoom;
-
-    /**
-     * Date when a provider selects a picks or selects from the queue
-     */
+	
+	/**
+	 * Root facility location for fast filtering and reporting (denormalized from the location
+	 * hierarchy).
+	 */
+	@ManyToOne
+	@JoinColumn(name = "facility_location")
+	private Location facilityLocation;
+	
+	/**
+	 * Ticket number that is safe for patient-facing displays (e.g. OPD-034). For backward
+	 * compatibility this may match visitNumber.
+	 */
+	@Column(name = "ticket_number", length = 50)
+	private String ticketNumber;
+	
+	/**
+	 * Date-part of the queue (facility timezone). Used for "today" views.
+	 */
+	@Column(name = "queue_date")
+	private java.sql.Date queueDate;
+	
+	/**
+	 * A computed priority score used for ordering (higher means sooner).
+	 */
+	@Column(name = "priority_score")
+	private Integer priorityScore;
+	
+	@Column(name = "priority_reason", length = 255)
+	private String priorityReason;
+	
+	@Column(name = "checked_in_at")
+	private Date checkedInAt;
+	
+	@Column(name = "called_at")
+	private Date calledAt;
+	
+	@Column(name = "started_at")
+	private Date startedAt;
+	
+	@Column(name = "ended_at")
+	private Date endedAt;
+	
+	/**
+	 * Date when a provider selects a picks or selects from the queue
+	 */
 	@Column(name = "date_picked")
 	private Date datePicked;
-
-    /**
-     * Date when the patient queue is completed
-     */
+	
+	/**
+	 * Date when the patient queue is completed
+	 */
 	@Column(name = "date_completed")
 	private Date dateCompleted;
 	
@@ -84,7 +126,27 @@ public class PatientQueue extends BaseOpenmrsData implements Serializable {
 	}
 	
 	public enum Status {
-		PENDING, COMPLETED, PICKED;
+		// Legacy states (kept for backward compatibility with existing deployments/UIs)
+		PENDING, PICKED,
+		
+		// Preferred states for richer queue workflows (displays, kiosks, no-shows)
+		WAITING, PRESENT, CALLED, IN_SERVICE, COMPLETED, NO_SHOW, SKIPPED, CANCELLED;
+	}
+	
+	/**
+	 * Convenience alias for department/service queue location. In this module, locationTo
+	 * historically represents the queue destination.
+	 */
+	public Location getQueueLocation() {
+		return getLocationTo();
+	}
+	
+	/**
+	 * Convenience alias for service point location (room/counter). In this module, queueRoom
+	 * historically represents the service location.
+	 */
+	public Location getServiceLocation() {
+		return getQueueRoom();
 	}
 	
 	public Integer getId() {
@@ -189,6 +251,78 @@ public class PatientQueue extends BaseOpenmrsData implements Serializable {
 	
 	public void setQueueRoom(Location queueRoom) {
 		this.queueRoom = queueRoom;
+	}
+	
+	public Location getFacilityLocation() {
+		return facilityLocation;
+	}
+	
+	public void setFacilityLocation(Location facilityLocation) {
+		this.facilityLocation = facilityLocation;
+	}
+	
+	public String getTicketNumber() {
+		return ticketNumber;
+	}
+	
+	public void setTicketNumber(String ticketNumber) {
+		this.ticketNumber = ticketNumber;
+	}
+	
+	public java.sql.Date getQueueDate() {
+		return queueDate;
+	}
+	
+	public void setQueueDate(java.sql.Date queueDate) {
+		this.queueDate = queueDate;
+	}
+	
+	public Integer getPriorityScore() {
+		return priorityScore;
+	}
+	
+	public void setPriorityScore(Integer priorityScore) {
+		this.priorityScore = priorityScore;
+	}
+	
+	public String getPriorityReason() {
+		return priorityReason;
+	}
+	
+	public void setPriorityReason(String priorityReason) {
+		this.priorityReason = priorityReason;
+	}
+	
+	public Date getCheckedInAt() {
+		return checkedInAt;
+	}
+	
+	public void setCheckedInAt(Date checkedInAt) {
+		this.checkedInAt = checkedInAt;
+	}
+	
+	public Date getCalledAt() {
+		return calledAt;
+	}
+	
+	public void setCalledAt(Date calledAt) {
+		this.calledAt = calledAt;
+	}
+	
+	public Date getStartedAt() {
+		return startedAt;
+	}
+	
+	public void setStartedAt(Date startedAt) {
+		this.startedAt = startedAt;
+	}
+	
+	public Date getEndedAt() {
+		return endedAt;
+	}
+	
+	public void setEndedAt(Date endedAt) {
+		this.endedAt = endedAt;
 	}
 	
 	public Date getDatePicked() {
