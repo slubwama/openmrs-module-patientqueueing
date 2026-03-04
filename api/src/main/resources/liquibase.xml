@@ -163,4 +163,153 @@
             <column name="date_completed" type="datetime" />
         </addColumn>
     </changeSet>
+
+    <!-- 2026 enhancements: richer queue workflows and display/kiosk support -->
+
+    <changeSet author="slubwama" id="patientqueue_20260227-1">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="patient_queue"/>
+            <not><columnExists tableName="patient_queue" columnName="facility_location"/></not>
+        </preConditions>
+        <addColumn tableName="patient_queue">
+            <column name="facility_location" type="INT" />
+            <column name="ticket_number" type="VARCHAR(50)" />
+            <column name="queue_date" type="DATE" />
+            <column name="priority_score" type="INT" />
+            <column name="priority_reason" type="VARCHAR(255)" />
+            <column name="checked_in_at" type="datetime" />
+            <column name="called_at" type="datetime" />
+            <column name="started_at" type="datetime" />
+            <column name="ended_at" type="datetime" />
+        </addColumn>
+    </changeSet>
+
+    <changeSet author="slubwama" id="patientqueue_20260227-2">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="patient_queue" columnName="facility_location"/>
+        </preConditions>
+        <createIndex indexName="patient_queue_facility_location_idx" tableName="patient_queue">
+            <column name="facility_location"/>
+        </createIndex>
+        <createIndex indexName="patient_queue_queue_date_idx" tableName="patient_queue">
+            <column name="queue_date"/>
+        </createIndex>
+        <createIndex indexName="patient_queue_ticket_number_idx" tableName="patient_queue" unique="false">
+            <column name="ticket_number"/>
+        </createIndex>
+    </changeSet>
+
+    <changeSet author="slubwama" id="patientqueue_20260227-3">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="patient_queue" columnName="facility_location"/>
+        </preConditions>
+        <addForeignKeyConstraint baseColumnNames="facility_location" baseTableName="patient_queue"
+                                 constraintName="patient_queue_facility_location_fk"
+                                 referencedColumnNames="location_id" referencedTableName="location"
+                                 onDelete="NO ACTION" onUpdate="NO ACTION"/>
+    </changeSet>
+
+    <changeSet author="slubwama" id="patientqueue_20260302-1">
+
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <tableExists tableName="patient_queue_event"/>
+            </not>
+        </preConditions>
+
+        <createTable tableName="patient_queue_event">
+
+            <!-- Primary Key -->
+            <column name="patient_queue_event_id" type="INT" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+
+            <!-- Core fields -->
+            <column name="patient_queue_id" type="INT">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="event_type" type="VARCHAR(50)">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="from_queue_location" type="INT"/>
+            <column name="to_queue_location" type="INT"/>
+            <column name="from_service_location" type="INT"/>
+            <column name="to_service_location" type="INT"/>
+            <column name="actor_user" type="INT"/>
+            <column name="actor_device_id" type="VARCHAR(100)"/>
+
+            <column name="event_time" type="DATETIME">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="details" type="VARCHAR(2000)"/>
+
+            <column name="date_created" type="DATETIME">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="creator" type="INT">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="changed_by" type="INT"/>
+            <column name="date_changed" type="DATETIME"/>
+
+            <column name="voided" type="BOOLEAN" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="voided_by" type="INT"/>
+            <column name="date_voided" type="DATETIME"/>
+            <column name="void_reason" type="VARCHAR(255)"/>
+
+            <column name="uuid" type="VARCHAR(38)">
+                <constraints nullable="false" unique="true"/>
+            </column>
+
+        </createTable>
+
+    </changeSet>
+
+    <changeSet author="slubwama" id="patientqueue_20260302-2">
+
+        <createIndex indexName="pqe_queue_idx" tableName="patient_queue_event">
+            <column name="patient_queue_id"/>
+        </createIndex>
+
+        <createIndex indexName="pqe_event_time_idx" tableName="patient_queue_event">
+            <column name="event_time"/>
+        </createIndex>
+
+        <addForeignKeyConstraint
+                baseTableName="patient_queue_event"
+                baseColumnNames="patient_queue_id"
+                referencedTableName="patient_queue"
+                referencedColumnNames="patient_queue_id"
+                constraintName="fk_pqe_queue"/>
+
+        <addForeignKeyConstraint
+                baseTableName="patient_queue_event"
+                baseColumnNames="creator"
+                referencedTableName="users"
+                referencedColumnNames="user_id"
+                constraintName="fk_pqe_creator"/>
+
+        <addForeignKeyConstraint
+                baseTableName="patient_queue_event"
+                baseColumnNames="changed_by"
+                referencedTableName="users"
+                referencedColumnNames="user_id"
+                constraintName="fk_pqe_changed_by"/>
+
+        <addForeignKeyConstraint
+                baseTableName="patient_queue_event"
+                baseColumnNames="voided_by"
+                referencedTableName="users"
+                referencedColumnNames="user_id"
+                constraintName="fk_pqe_voided_by"/>
+
+    </changeSet>
 </databaseChangeLog>
