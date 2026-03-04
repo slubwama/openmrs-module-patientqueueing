@@ -35,7 +35,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.Map;
 
-@Resource(name = RestConstants.VERSION_1 + "/patientqueue", supportedClass = PatientQueue.class, supportedOpenmrsVersions = { "1.9.* - 9.*" })
+@Resource(name = RestConstants.VERSION_1 + "/patientqueue", supportedClass = PatientQueue.class, supportedOpenmrsVersions = {"1.9.* - 9.*"})
 public class PatientQueueResource extends DelegatingCrudResource<PatientQueue> {
 	
 	private PatientQueueingService service() {
@@ -46,11 +46,10 @@ public class PatientQueueResource extends DelegatingCrudResource<PatientQueue> {
 	public PatientQueue newDelegate() {
 		return new PatientQueue();
 	}
-	
+
 	@Override
 	public PatientQueue save(PatientQueue patientQueue) {
-		PatientQueueingService patientQueueingService = service();
-		// Legacy behavior: assign visit number for today
+		PatientQueueingService patientQueueingService=Context.getService(PatientQueueingService.class);
 		patientQueue = patientQueueingService.assignVisitNumberForToday(patientQueue);
 		return patientQueueingService.savePatientQue(patientQueue);
 	}
@@ -149,8 +148,8 @@ public class PatientQueueResource extends DelegatingCrudResource<PatientQueue> {
 			description.addProperty("priorityReason");
 			
 			description.addSelfLink();
+
 			return description;
-			
 		} else if (rep instanceof FullRepresentation) {
 			DelegatingResourceDescription description = new DelegatingResourceDescription();
 			description.addProperty("uuid");
@@ -187,7 +186,6 @@ public class PatientQueueResource extends DelegatingCrudResource<PatientQueue> {
 			description.addSelfLink();
 			description.addLink("full", ".?v=" + RestConstants.REPRESENTATION_FULL);
 			return description;
-			
 		} else if (rep instanceof RefRepresentation) {
 			DelegatingResourceDescription description = new DelegatingResourceDescription();
 			description.addProperty("uuid");
@@ -214,7 +212,7 @@ public class PatientQueueResource extends DelegatingCrudResource<PatientQueue> {
 	
 	@Override
 	public void purge(PatientQueue patientQueue, RequestContext requestContext) throws ResponseException {
-		// legacy no-op
+
 	}
 	
 	@Override
@@ -229,6 +227,7 @@ public class PatientQueueResource extends DelegatingCrudResource<PatientQueue> {
 		description.addProperty("visitNumber");
 		description.addProperty("priority");
 		description.addProperty("queueRoom");
+		description.addProperty("provider");
 		description.addProperty("datePicked");
 		description.addProperty("dateCompleted");
 		description.addProperty("priorityComment");
