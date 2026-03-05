@@ -68,30 +68,30 @@ public class PatientQueue extends BaseOpenmrsData implements Serializable {
 	@ManyToOne
 	@JoinColumn(name = "queue_room")
 	private Location queueRoom;
-
-    /**
-     * Date when a provider selects a picks or selects from the queue
-     */
+	
+	/**
+	 * Date when a provider selects a picks or selects from the queue
+	 */
 	@Column(name = "date_picked")
 	private Date datePicked;
-
-    /**
-     * Date when the patient queue is completed
-     */
+	
+	/**
+	 * Date when the patient queue is completed
+	 */
 	@Column(name = "date_completed")
 	private Date dateCompleted;
-
-    /**
-     * Date when the patient queue is Cancelled
-     */
-    @Column(name = "date_cancelled")
-    private Date dateCancelled;
-
+	
+	/**
+	 * Date when the patient queue is Cancelled
+	 */
+	@Column(name = "date_cancelled")
+	private Date dateCancelled;
+	
 	public PatientQueue() {
 	}
 	
 	public enum Status {
-		PENDING, COMPLETED, PICKED,CANCELLED;
+		PENDING, COMPLETED, PICKED, CANCELLED;
 	}
 	
 	public Integer getId() {
@@ -213,37 +213,36 @@ public class PatientQueue extends BaseOpenmrsData implements Serializable {
 	public void setDateCompleted(Date dateCompleted) {
 		this.dateCompleted = dateCompleted;
 	}
-
-    public Date getDateCancelled() {
-        return dateCancelled;
-    }
-
-    public void setDateCancelled(Date dateCancelled) {
-        this.dateCancelled = dateCancelled;
-    }
-
-
-    /**
-     * For kiosk/display: ended time (alias of dateCompleted).
-     */
-    @Transient
-    public Date getEndedAt() {
-        return getDateCompleted();
-    }
-
-    /**
-     * priorityScore alias
-     */
-    @Transient
-    public Integer getPriorityScore() {
-        return getPriority();
-    }
-
-    /**
-     * priorityReason alias
-     */
-    @Transient
-    public String getPriorityReason() {
-        return getPriorityComment();
-    }
+	
+	public Date getDateCancelled() {
+		return dateCancelled;
+	}
+	
+	public void setDateCancelled(Date dateCancelled) {
+		this.dateCancelled = dateCancelled;
+	}
+	
+	/**
+	 * For kiosk/display: ended time (alias of dateCompleted).
+	 */
+	@Transient
+	public Date getEndedAt() {
+		return getDateCompleted();
+	}
+	
+	/**
+	 * priorityScore alias
+	 */
+	@Transient
+	public Integer getPriorityScore() {
+		return getPriority();
+	}
+	
+	/**
+	 * priorityReason alias
+	 */
+	@Transient
+	public String getPriorityReason() {
+		return getPriorityComment();
+	}
 }

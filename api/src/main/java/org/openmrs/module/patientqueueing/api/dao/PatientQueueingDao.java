@@ -215,17 +215,20 @@ public class PatientQueueingDao {
 	/**
 	 * Find a queue entry by its ticket number (or legacy visit number) within a date range.
 	 */
-	public PatientQueue getPatientQueueByTicketNumber(String ticketNumberOrVisitNumber, Date fromDate, Date toDate) {
+	public List<PatientQueue> getPatientQueuesByTicketNumber(String visitNumber, Date fromDate, Date toDate) {
 		Criteria criteria = getSession().createCriteria(PatientQueue.class);
+		
 		if (fromDate != null && toDate != null) {
 			criteria.add(Restrictions.between("dateCreated", fromDate, toDate));
 		}
-		criteria.add(Restrictions.or(Restrictions.eq("ticketNumber", ticketNumberOrVisitNumber),
-		    Restrictions.eq("visitNumber", ticketNumberOrVisitNumber)));
+		
+		criteria.add(Restrictions.eq("visitNumber", visitNumber));
 		criteria.add(Restrictions.ne("status", PatientQueue.Status.CANCELLED));
-		criteria.setMaxResults(1);
+		
+		// newest first so callers can easily pick latest movement if they want
 		criteria.addOrder(Order.desc("dateCreated"));
-		return (PatientQueue) criteria.uniqueResult();
+		
+		return criteria.list();
 	}
 	
 	public List<PatientQueue> getPatientQueueListFifo(Provider provider, Date fromDate, Date toDate, Location locationTo,

@@ -211,14 +211,8 @@ public interface PatientQueueingService extends OpenmrsService {
 	 * Find a queue entry by ticket number (or legacy visit number) for a date range.
 	 */
 	@Transactional(readOnly = true)
-	public PatientQueue getPatientQueueByTicketNumber(String ticketNumberOrVisitNumber, Date fromDate, Date toDate);
-	
-	/**
-	 * Mark a queue entry as PRESENT (checked-in).
-	 */
-	@Transactional
-	public PatientQueue checkInByTicketNumber(String ticketNumberOrVisitNumber, Location facilityLocation, String deviceId);
-	
+	public List<PatientQueue> getPatientQueueByTicketNumber(String ticketNumberOrVisitNumber, Date fromDate, Date toDate);
+
 	@Transactional
 	public List<PatientQueue> getPatientQueueListFifo(Provider provider, Date fromDate, Date toDate, Location locationTo,
                                                       Location locationFrom, Patient patient, PatientQueue.Status status, Location queueRoom);

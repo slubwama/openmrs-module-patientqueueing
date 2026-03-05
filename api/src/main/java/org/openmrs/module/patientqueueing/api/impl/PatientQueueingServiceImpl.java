@@ -280,51 +280,20 @@ public class PatientQueueingServiceImpl extends BaseOpenmrsService implements Pa
 	/* =========================================================
 	   KIOSK SUPPORT (NO facilityLocation / NO new model columns)
 	   ========================================================= */
+	
+	@Override
+	public List<PatientQueue> getPatientQueueByTicketNumber(String ticketNumberOrVisitNumber, Date fromDate, Date toDate) {
+		return dao.getPatientQueuesByTicketNumber(ticketNumberOrVisitNumber, fromDate, toDate);
+	}
 
-    @Override
-    public PatientQueue getPatientQueueByTicketNumber(String ticketNumberOrVisitNumber, Date fromDate, Date toDate) {
-        return dao.getPatientQueueByTicketNumber(ticketNumberOrVisitNumber, fromDate, toDate);
-    }
-
-    @Override
-    public PatientQueue checkInByTicketNumber(String ticketNumberOrVisitNumber, Location facilityLocation, String deviceId) {
-        // facilityLocation intentionally ignored here because the model is standalone (no multitenancy).
-        // Keep the parameter for API compatibility, but do not require facility filtering.
-
-        Date today = new Date();
-        PatientQueue pq = dao.getPatientQueueByTicketNumber(
-                ticketNumberOrVisitNumber,
-                OpenmrsUtil.firstSecondOfDay(today),
-                OpenmrsUtil.getLastMomentOfDay(today)
-        );
-
-        if (pq == null) {
-            return null;
-        }
-
-        // Only move forward (do not override completed)
-        if (pq.getStatus() != PatientQueue.Status.COMPLETED) {
-            // Minimal: set to PENDING (kiosk check-in implies waiting)
-            pq.setStatus(PatientQueue.Status.PENDING);
-
-            PatientQueue saved = dao.savePatientQueue(pq);
-
-            createAuditEvent(saved, PatientQueueEvent.EventType.CHECKED_IN,
-                    deviceId != null ? "deviceId=" + deviceId : null);
-
-            return saved;
-        }
-
-        return pq;
-    }
-
-    @Override
-    public List<PatientQueue> getPatientQueueListFifo(Provider provider, Date fromDate, Date toDate,
-                                                      Location locationTo, Location locationFrom, Patient patient, PatientQueue.Status status, Location queueRoom) {
-        return dao.getPatientQueueListFifo(provider, fromDate, toDate, locationTo, locationFrom, patient, status, queueRoom);
-    }
-
-    @Override
+	
+	@Override
+	public List<PatientQueue> getPatientQueueListFifo(Provider provider, Date fromDate, Date toDate, Location locationTo,
+	        Location locationFrom, Patient patient, PatientQueue.Status status, Location queueRoom) {
+		return dao.getPatientQueueListFifo(provider, fromDate, toDate, locationTo, locationFrom, patient, status, queueRoom);
+	}
+	
+	@Override
     public List<PatientQueue> getPatientQueueByParentLocationFifo(Location parentLocation, PatientQueue.Status status,
                                                                   Date fromDate, Date toDate, boolean onlyInQueueRooms) {
         LocationTag queueRomTag = Context.getLocationService().getLocationTagByUuid(ROOM_TAG_UUID);
@@ -336,23 +305,23 @@ public class PatientQueueingServiceImpl extends BaseOpenmrsService implements Pa
         }
         return dao.getPatientsInQueueRoomFifo(childLocations, status, fromDate, toDate);
     }
-
-    private void createAuditEvent(PatientQueue patientQueue, PatientQueueEvent.EventType type, String details) {
-        try {
-            PatientQueueEvent event = new PatientQueueEvent();
-            event.setPatientQueue(patientQueue);
-            event.setEventType(type);
-            event.setEventTime(new Date());
-            event.setActorUser(Context.getAuthenticatedUser());
-            event.setFromQueueLocation(patientQueue.getLocationTo());
-            event.setToQueueLocation(patientQueue.getLocationTo());
-            event.setFromServiceLocation(patientQueue.getQueueRoom());
-            event.setToServiceLocation(patientQueue.getQueueRoom());
-            event.setDetails(details);
-            dao.savePatientQueueEvent(event);
-        }
-        catch (Exception ignore) {
-            // do not block queue ops if audit logging fails
-        }
-    }
+	
+	private void createAuditEvent(PatientQueue patientQueue, PatientQueueEvent.EventType type, String details) {
+		try {
+			PatientQueueEvent event = new PatientQueueEvent();
+			event.setPatientQueue(patientQueue);
+			event.setEventType(type);
+			event.setEventTime(new Date());
+			event.setActorUser(Context.getAuthenticatedUser());
+			event.setFromQueueLocation(patientQueue.getLocationTo());
+			event.setToQueueLocation(patientQueue.getLocationTo());
+			event.setFromServiceLocation(patientQueue.getQueueRoom());
+			event.setToServiceLocation(patientQueue.getQueueRoom());
+			event.setDetails(details);
+			dao.savePatientQueueEvent(event);
+		}
+		catch (Exception ignore) {
+			// do not block queue ops if audit logging fails
+		}
+	}
 }

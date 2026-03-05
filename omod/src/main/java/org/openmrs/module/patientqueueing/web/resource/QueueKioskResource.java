@@ -39,12 +39,7 @@ public class QueueKioskResource extends DelegatingCrudResource<PatientQueue> {
 	 */
 	@Override
 	public PatientQueue getByUniqueId(String ticketNumber) {
-		if (ticketNumber == null || ticketNumber.trim().isEmpty()) {
-			return null;
-		}
-		Date now = new Date();
-		return service().getPatientQueueByTicketNumber(ticketNumber, OpenmrsUtil.firstSecondOfDay(now),
-		    OpenmrsUtil.getLastMomentOfDay(now));
+		throw new ResourceDoesNotSupportOperationException("QueueKioskResource does not support getByUniqueId");
 	}
 	
 	/**
@@ -54,20 +49,21 @@ public class QueueKioskResource extends DelegatingCrudResource<PatientQueue> {
 	 */
 	@Override
 	protected NeedsPaging<PatientQueue> doSearch(RequestContext context) throws ResponseException {
-		String ticketNumber = context.getParameter("ticketNumber");
+		String ticketNumber = context.getParameter("visitNumber");
 		if (ticketNumber == null || ticketNumber.trim().isEmpty()) {
-			// This is a bad request, not "operation unsupported"
 			throw new ResourceDoesNotSupportOperationException("ticketNumber is required");
 		}
 		
-		PatientQueue pq = getByUniqueId(ticketNumber);
-		if (pq == null) {
-			// Not found
+		Date now = new Date();
+		
+		List<PatientQueue> list = service().getPatientQueueByTicketNumber(ticketNumber, OpenmrsUtil.firstSecondOfDay(now),
+		    OpenmrsUtil.getLastMomentOfDay(now));
+		
+		if (list == null || list.isEmpty()) {
 			throw new ResourceDoesNotSupportOperationException("Ticket not found: " + ticketNumber);
 		}
 		
-		List<PatientQueue> one = Collections.singletonList(pq);
-		return new NeedsPaging<PatientQueue>(one, context);
+		return new NeedsPaging<PatientQueue>(list, context);
 	}
 	
 	/**
@@ -76,36 +72,13 @@ public class QueueKioskResource extends DelegatingCrudResource<PatientQueue> {
 	 */
 	@Override
 	public PatientQueue create(SimpleObject propertiesToCreate, RequestContext context) throws ResponseException {
-		String ticketNumber = asString(propertiesToCreate, "ticketNumber");
-		String facilityUuid = asString(propertiesToCreate, "facilityUuid");
-		String deviceId = (context != null && context.getRequest() != null) ? context.getRequest().getHeader("X-Device-Id")
-		        : null;
-		
-		if (ticketNumber == null || ticketNumber.trim().isEmpty()) {
-			throw new ResourceDoesNotSupportOperationException("ticketNumber is required");
-		}
-		
-		Location facility = null;
-		if (facilityUuid != null && !facilityUuid.trim().isEmpty()) {
-			facility = Context.getLocationService().getLocationByUuid(facilityUuid);
-			if (facility == null) {
-				throw new ResourceDoesNotSupportOperationException("facilityUuid not found: " + facilityUuid);
-			}
-		}
-		
-		PatientQueue updated = service().checkInByTicketNumber(ticketNumber, facility, deviceId);
-		if (updated == null) {
-			throw new ResourceDoesNotSupportOperationException("Ticket not found: " + ticketNumber);
-		}
-		
-		return updated;
+		throw new ResourceDoesNotSupportOperationException("QueueKioskResource does not support getByUniqueId");
 	}
 	
 	// --- Unsupported operations ---
 	
 	@Override
 	public PatientQueue save(PatientQueue delegate) {
-		// Not used; kiosk uses create() and lookup only.
 		throw new ResourceDoesNotSupportOperationException("QueueKioskResource does not support save/update");
 	}
 	
@@ -137,15 +110,13 @@ public class QueueKioskResource extends DelegatingCrudResource<PatientQueue> {
 		if (rep instanceof DefaultRepresentation) {
 			DelegatingResourceDescription d = new DelegatingResourceDescription();
 			d.addProperty("uuid");
-			d.addProperty("ticketNumber");
 			d.addProperty("visitNumber");
 			d.addProperty("status");
 			d.addProperty("locationTo", Representation.REF); // queue location
 			d.addProperty("queueRoom", Representation.REF); // service room
-			d.addProperty("checkedInAt");
-			d.addProperty("calledAt");
-			d.addProperty("startedAt");
-			d.addProperty("endedAt");
+			d.addProperty("pickedDate");
+			d.addProperty("dateCompleted");
+			d.addProperty("dateCancelled");
 			d.addProperty("dateCreated");
 			d.addSelfLink();
 			return d;
@@ -154,15 +125,13 @@ public class QueueKioskResource extends DelegatingCrudResource<PatientQueue> {
 		if (rep instanceof FullRepresentation) {
 			DelegatingResourceDescription d = new DelegatingResourceDescription();
 			d.addProperty("uuid");
-			d.addProperty("ticketNumber");
 			d.addProperty("visitNumber");
 			d.addProperty("status");
 			d.addProperty("locationTo");
 			d.addProperty("queueRoom");
-			d.addProperty("checkedInAt");
-			d.addProperty("calledAt");
-			d.addProperty("startedAt");
-			d.addProperty("endedAt");
+			d.addProperty("pickedDate");
+			d.addProperty("dateCompleted");
+			d.addProperty("dateCancelled");
 			d.addProperty("dateCreated");
 			d.addProperty("dateChanged");
 			d.addProperty("creator", Representation.REF);
@@ -177,15 +146,11 @@ public class QueueKioskResource extends DelegatingCrudResource<PatientQueue> {
 	
 	@Override
 	public DelegatingResourceDescription getCreatableProperties() {
-		DelegatingResourceDescription d = new DelegatingResourceDescription();
-		d.addRequiredProperty("ticketNumber");
-		d.addProperty("facilityUuid");
-		return d;
+		return null;
 	}
 	
 	@Override
 	public DelegatingResourceDescription getUpdatableProperties() {
-		// Kiosk does not support PUT updates
 		return null;
 	}
 	
