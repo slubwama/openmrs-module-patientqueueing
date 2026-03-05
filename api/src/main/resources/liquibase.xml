@@ -165,50 +165,6 @@
     </changeSet>
 
     <!-- 2026 enhancements: richer queue workflows and display/kiosk support -->
-
-    <changeSet author="slubwama" id="patientqueue_20260227-1">
-        <preConditions onFail="MARK_RAN">
-            <tableExists tableName="patient_queue"/>
-            <not><columnExists tableName="patient_queue" columnName="facility_location"/></not>
-        </preConditions>
-        <addColumn tableName="patient_queue">
-            <column name="facility_location" type="INT" />
-            <column name="ticket_number" type="VARCHAR(50)" />
-            <column name="queue_date" type="DATE" />
-            <column name="priority_score" type="INT" />
-            <column name="priority_reason" type="VARCHAR(255)" />
-            <column name="checked_in_at" type="datetime" />
-            <column name="called_at" type="datetime" />
-            <column name="started_at" type="datetime" />
-            <column name="ended_at" type="datetime" />
-        </addColumn>
-    </changeSet>
-
-    <changeSet author="slubwama" id="patientqueue_20260227-2">
-        <preConditions onFail="MARK_RAN">
-            <columnExists tableName="patient_queue" columnName="facility_location"/>
-        </preConditions>
-        <createIndex indexName="patient_queue_facility_location_idx" tableName="patient_queue">
-            <column name="facility_location"/>
-        </createIndex>
-        <createIndex indexName="patient_queue_queue_date_idx" tableName="patient_queue">
-            <column name="queue_date"/>
-        </createIndex>
-        <createIndex indexName="patient_queue_ticket_number_idx" tableName="patient_queue" unique="false">
-            <column name="ticket_number"/>
-        </createIndex>
-    </changeSet>
-
-    <changeSet author="slubwama" id="patientqueue_20260227-3">
-        <preConditions onFail="MARK_RAN">
-            <columnExists tableName="patient_queue" columnName="facility_location"/>
-        </preConditions>
-        <addForeignKeyConstraint baseColumnNames="facility_location" baseTableName="patient_queue"
-                                 constraintName="patient_queue_facility_location_fk"
-                                 referencedColumnNames="location_id" referencedTableName="location"
-                                 onDelete="NO ACTION" onUpdate="NO ACTION"/>
-    </changeSet>
-
     <changeSet author="slubwama" id="patientqueue_20260302-1">
 
         <preConditions onFail="MARK_RAN">
@@ -314,18 +270,18 @@
     </changeSet>
 
 
-<changeSet author="slubwama" id="patientqueue_20260304-1_add_date_cancelled">
-    <preConditions onFail="MARK_RAN">
-        <and>
-            <tableExists tableName="patient_queue"/>
-            <not>
-                <columnExists tableName="patient_queue" columnName="date_cancelled"/>
-            </not>
-        </and>
-    </preConditions>
-    <addColumn tableName="patient_queue">
-        <column name="date_cancelled" type="datetime"/>
-    </addColumn>
-</changeSet>
+    <changeSet author="slubwama" id="patientqueue_20260304-1_add_date_cancelled">
+        <preConditions onFail="MARK_RAN">
+            <and>
+                <tableExists tableName="patient_queue"/>
+                <not>
+                    <columnExists tableName="patient_queue" columnName="date_cancelled"/>
+                </not>
+            </and>
+        </preConditions>
+        <addColumn tableName="patient_queue">
+            <column name="date_cancelled" type="datetime"/>
+        </addColumn>
+    </changeSet>
 
 </databaseChangeLog>
