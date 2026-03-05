@@ -164,11 +164,9 @@ public class QueueDisplayResource extends DelegatingCrudResource<QueueDisplayDto
 			for (PatientQueue pq : items) {
 				PatientQueue.Status st = pq.getStatus();
 				
-				boolean isNow = st == PatientQueue.Status.IN_SERVICE || st == PatientQueue.Status.CALLED
-				        || st == PatientQueue.Status.PICKED;
+				boolean isNow = st == PatientQueue.Status.PICKED;
 				
-				boolean isNext = st == PatientQueue.Status.PRESENT || st == PatientQueue.Status.WAITING
-				        || st == PatientQueue.Status.PENDING;
+				boolean isNext = st == PatientQueue.Status.PENDING;
 				
 				if (isNow)
 					nowServing.add(toRow(pq));
@@ -213,7 +211,7 @@ public class QueueDisplayResource extends DelegatingCrudResource<QueueDisplayDto
 		QueueDisplayRowDto row = new QueueDisplayRowDto();
 		row.setUuid(pq.getUuid());
 		
-		String ticket = pq.getTicketNumber() != null ? pq.getTicketNumber() : pq.getVisitNumber();
+		String ticket = pq.getVisitNumber();
 		row.setTicketNumber(ticket);
 		
 		row.setStatus(pq.getStatus() != null ? pq.getStatus().name() : null);

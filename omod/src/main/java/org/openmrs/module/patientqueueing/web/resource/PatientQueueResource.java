@@ -2,16 +2,17 @@ package org.openmrs.module.patientqueueing.web.resource;
 
 import io.swagger.models.Model;
 import io.swagger.models.ModelImpl;
+import io.swagger.models.properties.StringProperty;
 import io.swagger.models.properties.BooleanProperty;
 import io.swagger.models.properties.DateProperty;
-import io.swagger.models.properties.IntegerProperty;
 import io.swagger.models.properties.RefProperty;
-import io.swagger.models.properties.StringProperty;
+import io.swagger.models.properties.IntegerProperty;
 import org.openmrs.Location;
 import org.openmrs.api.context.Context;
 import org.openmrs.module.patientqueueing.api.PatientQueueingService;
 import org.openmrs.module.patientqueueing.model.PatientQueue;
 import org.openmrs.module.webservices.rest.SimpleObject;
+import org.openmrs.module.webservices.rest.web.ConversionUtil;
 import org.openmrs.module.webservices.rest.web.RequestContext;
 import org.openmrs.module.webservices.rest.web.RestConstants;
 import org.openmrs.module.webservices.rest.web.annotation.Resource;
@@ -37,11 +38,7 @@ import java.util.Map;
 
 @Resource(name = RestConstants.VERSION_1 + "/patientqueue", supportedClass = PatientQueue.class, supportedOpenmrsVersions = {"1.9.* - 9.*"})
 public class PatientQueueResource extends DelegatingCrudResource<PatientQueue> {
-	
-	private PatientQueueingService service() {
-		return Context.getService(PatientQueueingService.class);
-	}
-	
+
 	@Override
 	public PatientQueue newDelegate() {
 		return new PatientQueue();
@@ -51,54 +48,57 @@ public class PatientQueueResource extends DelegatingCrudResource<PatientQueue> {
 	public PatientQueue save(PatientQueue patientQueue) {
 		PatientQueueingService patientQueueingService=Context.getService(PatientQueueingService.class);
 		patientQueue = patientQueueingService.assignVisitNumberForToday(patientQueue);
-		return patientQueueingService.savePatientQue(patientQueue);
+		return Context.getService(PatientQueueingService.class).savePatientQue(patientQueue);
 	}
 	
 	@Override
 	public PatientQueue getByUniqueId(String uniqueId) {
-		PatientQueue patientQueue = service().getPatientQueueByUuid(uniqueId);
+		PatientQueue patientQueue = null;
+		Integer id = null;
+		
+		patientQueue = Context.getService(PatientQueueingService.class).getPatientQueueByUuid(uniqueId);
 		if (patientQueue == null && uniqueId != null) {
-			Integer id = null;
 			try {
-				id = Integer.valueOf(uniqueId);
+				id = Integer.parseInt(uniqueId);
 			}
-			catch (Exception e) {
-				// ignore
-			}
+			catch (Exception e) {}
+			
 			if (id != null) {
-				patientQueue = service().getPatientQueueById(id);
+				patientQueue = Context.getService(PatientQueueingService.class).getPatientQueueById(id);
 			}
 		}
+		
 		return patientQueue;
 	}
 	
-	/**
-	 * ✅ Return a PatientQueue (not Object). OpenMRS REST will still wrap/convert based on
-	 * representation.
-	 */
 	@Override
-	public PatientQueue update(String uuid, SimpleObject propertiesToUpdate, RequestContext context)
-	        throws ResponseException {
-		Object statusObj = propertiesToUpdate.get("status");
-		if (statusObj == null) {
-			// fallback to default behavior (still results in a PatientQueue update)
-			super.update(uuid, propertiesToUpdate, context);
-			return getByUniqueId(uuid);
+	public Object update(String uuid, SimpleObject propertiesToUpdate, RequestContext context) throws ResponseException {
+		String status=propertiesToUpdate.get("status");
+		String datePicked=propertiesToUpdate.get("datePicked");
+		String dateCompleted=propertiesToUpdate.get("dateCompleted");
+
+		if (status == null) {
+			return super.update(uuid, propertiesToUpdate, context);
 		}
-		
-		String statusStr = String.valueOf(statusObj);
-		String normalized = normalizeStatus(statusStr);
-		
+
 		PatientQueue patientQueue = getPatientQueueForUpdate(uuid, propertiesToUpdate);
 		ValidateUtil.validate(patientQueue);
 		patientQueue.setDateChanged(new Date());
-		
-		// Apply mapped status + timestamps in a backward compatible way
-		applyStatusAndTimestamps(patientQueue, normalized);
-		
-		return save(patientQueue);
+
+        if (status.equals("picked") && datePicked==null) {
+            patientQueue.setDatePicked(new Date());
+        } else if (status.equals("completed") && dateCompleted==null) {
+            patientQueue.setDateCompleted(new Date());
+        } else if (status.equals("pending") && patientQueue.getDateCompleted() != null) {
+            patientQueue.setDateCompleted(null);
+        } else if (status.equals("pending") && patientQueue.getDatePicked() != null) {
+            patientQueue.setDatePicked(null);
+        }
+
+		patientQueue = save(patientQueue);
+		return ConversionUtil.convertToRepresentation(patientQueue, Representation.DEFAULT);
 	}
-	
+
 	public PatientQueue getPatientQueueForUpdate(String uuid, Map<String, Object> propertiesToUpdate) {
 		PatientQueue patientQueue = getByUniqueId(uuid);
 		PatientQueueResource patientQueueResource = (PatientQueueResource) Context.getService(RestService.class)
@@ -107,11 +107,11 @@ public class PatientQueueResource extends DelegatingCrudResource<PatientQueue> {
 		    patientQueueResource.getUpdatableProperties(), false);
 		return patientQueue;
 	}
-	
+
 	@Override
 	public NeedsPaging<PatientQueue> doGetAll(RequestContext context) throws ResponseException {
-		return new NeedsPaging<PatientQueue>(new ArrayList<PatientQueue>(service().getPatientQueueList(null, null, null,
-		    null, null, null, null)), context);
+		return new NeedsPaging<PatientQueue>(new ArrayList<PatientQueue>(Context.getService(PatientQueueingService.class)
+		        .getPatientQueueList(null, null, null, null, null, null, null)), context);
 	}
 	
 	@Override
@@ -138,17 +138,8 @@ public class PatientQueueResource extends DelegatingCrudResource<PatientQueue> {
 			description.addProperty("comment");
 			description.addProperty("queueRoom", Representation.REF);
 			
-			// New fields (safe additions)
-			description.addProperty("ticketNumber");
-			description.addProperty("checkedInAt");
-			description.addProperty("calledAt");
-			description.addProperty("startedAt");
-			description.addProperty("endedAt");
-			description.addProperty("priorityScore");
-			description.addProperty("priorityReason");
-			
 			description.addSelfLink();
-
+			
 			return description;
 		} else if (rep instanceof FullRepresentation) {
 			DelegatingResourceDescription description = new DelegatingResourceDescription();
@@ -173,16 +164,6 @@ public class PatientQueueResource extends DelegatingCrudResource<PatientQueue> {
 			description.addProperty("queueRoom");
 			description.addProperty("datePicked");
 			description.addProperty("dateCompleted");
-			
-			// New fields
-			description.addProperty("ticketNumber");
-			description.addProperty("checkedInAt");
-			description.addProperty("calledAt");
-			description.addProperty("startedAt");
-			description.addProperty("endedAt");
-			description.addProperty("priorityScore");
-			description.addProperty("priorityReason");
-			
 			description.addSelfLink();
 			description.addLink("full", ".?v=" + RestConstants.REPRESENTATION_FULL);
 			return description;
@@ -207,12 +188,12 @@ public class PatientQueueResource extends DelegatingCrudResource<PatientQueue> {
 	
 	@Override
 	protected void delete(PatientQueue patientQueue, String s, RequestContext requestContext) throws ResponseException {
-		// legacy no-op
+		
 	}
 	
 	@Override
 	public void purge(PatientQueue patientQueue, RequestContext requestContext) throws ResponseException {
-
+		
 	}
 	
 	@Override
@@ -232,59 +213,55 @@ public class PatientQueueResource extends DelegatingCrudResource<PatientQueue> {
 		description.addProperty("dateCompleted");
 		description.addProperty("priorityComment");
 		description.addProperty("comment");
-		
-		// New optional inputs
-		description.addProperty("ticketNumber");
-		description.addProperty("checkedInAt");
-		description.addProperty("calledAt");
-		description.addProperty("startedAt");
-		description.addProperty("endedAt");
-		description.addProperty("priorityScore");
-		description.addProperty("priorityReason");
-		
+
 		return description;
 	}
 	
 	@Override
 	protected PageableResult doSearch(RequestContext context) {
-		PatientQueueingService patientQueueingService = service();
+		PatientQueueingService patientQueueingService = Context.getService(PatientQueueingService.class);
 		
 		String locationQuery = context.getParameter("location");
 		String parentLocationQuery = context.getParameter("parentLocation");
 		boolean onlyInQueueRooms = Boolean.parseBoolean(context.getParameter("onlyInQueueRooms"));
-		String statusParam = context.getParameter("status");
+		String status = context.getParameter("status");
 		String queueRoomQuery = context.getParameter("room");
+		PatientQueue.Status queueStatus = null;
 		
 		Location location = null;
 		Location room = null;
 		
-		if (locationQuery != null && !locationQuery.trim().isEmpty()) {
+		if (locationQuery != null && !locationQuery.equals("")) {
 			location = Context.getLocationService().getLocationByUuid(locationQuery);
 		}
-		if (queueRoomQuery != null && !queueRoomQuery.trim().isEmpty()) {
+		
+		if (status != null && status.equals("pending")) {
+			queueStatus = PatientQueue.Status.PENDING;
+		} else if (status != null && status.equals("completed")) {
+			queueStatus = PatientQueue.Status.COMPLETED;
+		} else if (status != null && status.equals("picked")) {
+			queueStatus = PatientQueue.Status.PICKED;
+		}
+		
+		if (queueRoomQuery != null) {
 			room = Context.getLocationService().getLocationByUuid(queueRoomQuery);
 		}
 		
-		PatientQueue.Status queueStatus = mapToQueueStatus(normalizeStatus(statusParam));
-		
-		Date from = OpenmrsUtil.firstSecondOfDay(new Date());
-		Date to = OpenmrsUtil.getLastMomentOfDay(new Date());
-		
-		List<PatientQueue> results;
-		
-		if (parentLocationQuery != null && !parentLocationQuery.trim().isEmpty()) {
-			Location parent = Context.getLocationService().getLocationByUuid(parentLocationQuery);
-			results = patientQueueingService
-			        .getPatientQueueByParentLocation(parent, queueStatus, from, to, onlyInQueueRooms);
+		List<PatientQueue> PatientQueuesByQuery = null;
+
+		if (parentLocationQuery != null && !parentLocationQuery.equals("")) {
+			PatientQueuesByQuery = patientQueueingService.getPatientQueueByParentLocation(Context.getLocationService()
+			        .getLocationByUuid(parentLocationQuery), queueStatus, OpenmrsUtil.firstSecondOfDay(new Date()),
+			    OpenmrsUtil.getLastMomentOfDay(new Date()),onlyInQueueRooms);
 		} else {
-			results = patientQueueingService.getPatientQueueListBySearchParams(context.getParameter("searchString"), from,
-			    to, location, null, queueStatus, room);
+			PatientQueuesByQuery = patientQueueingService.getPatientQueueListBySearchParams(
+			    context.getParameter("searchString"), OpenmrsUtil.firstSecondOfDay(new Date()),
+			    OpenmrsUtil.getLastMomentOfDay(new Date()), location, null, queueStatus, room);
 		}
-		
-		return new NeedsPaging<PatientQueue>(results, context);
+
+		return new NeedsPaging<PatientQueue>(PatientQueuesByQuery, context);
 	}
-	
-	@Override
+
 	public DelegatingResourceDescription getUpdatableProperties() throws ResourceDoesNotSupportOperationException {
 		DelegatingResourceDescription description = new DelegatingResourceDescription();
 		description.addProperty("provider");
@@ -297,20 +274,9 @@ public class PatientQueueResource extends DelegatingCrudResource<PatientQueue> {
 		description.addProperty("comment");
 		description.addProperty("priorityComment");
 		description.addProperty("priority");
-		
-		// New optional fields
-		description.addProperty("ticketNumber");
-		description.addProperty("checkedInAt");
-		description.addProperty("calledAt");
-		description.addProperty("startedAt");
-		description.addProperty("endedAt");
-		description.addProperty("priorityScore");
-		description.addProperty("priorityReason");
-		
 		return description;
 	}
-	
-	// Swagger models (unchanged aside from dedupe)
+
 	@Override
 	public Model getGETModel(Representation rep) {
 		ModelImpl model = (ModelImpl) super.getGETModel(rep);
@@ -319,11 +285,7 @@ public class PatientQueueResource extends DelegatingCrudResource<PatientQueue> {
 			        .property("voided", new BooleanProperty()).property("priority", new IntegerProperty())
 			        .property("priorityComment", new StringProperty()).property("visitNumber", new StringProperty())
 			        .property("comment", new StringProperty()).property("status", new StringProperty())
-			        .property("datePicked", new DateProperty()).property("dateCompleted", new DateProperty())
-			        .property("ticketNumber", new StringProperty()).property("checkedInAt", new DateProperty())
-			        .property("calledAt", new DateProperty()).property("startedAt", new DateProperty())
-			        .property("endedAt", new DateProperty()).property("priorityScore", new IntegerProperty())
-			        .property("priorityReason", new StringProperty());
+			        .property("datePicked", new DateProperty()).property("dateCompleted", new DateProperty());
 		}
 		if (rep instanceof DefaultRepresentation) {
 			model.property("patient", new RefProperty("#/definitions/PatientGetRef"))
@@ -334,6 +296,7 @@ public class PatientQueueResource extends DelegatingCrudResource<PatientQueue> {
 			        .property("locationFrom", new RefProperty("#/definitions/LocationGetRef"))
 			        .property("locationTo", new RefProperty("#/definitions/LocationGetRef"))
 			        .property("encounter", new RefProperty("#/definitions/EncounterGetRef"));
+			
 		} else if (rep instanceof FullRepresentation) {
 			model.property("patient", new RefProperty("#/definitions/PatientGetRef"))
 			        .property("creator", new RefProperty("#/definitions/UserGetRef"))
@@ -355,11 +318,8 @@ public class PatientQueueResource extends DelegatingCrudResource<PatientQueue> {
 			        .property("voided", new BooleanProperty()).property("status", new StringProperty())
 			        .property("priority", new IntegerProperty()).property("priorityComment", new StringProperty())
 			        .property("visitNumber", new StringProperty()).property("comment", new StringProperty())
-			        .property("datePicked", new DateProperty()).property("dateCompleted", new DateProperty())
-			        .property("ticketNumber", new StringProperty()).property("checkedInAt", new DateProperty())
-			        .property("calledAt", new DateProperty()).property("startedAt", new DateProperty())
-			        .property("endedAt", new DateProperty()).property("priorityScore", new IntegerProperty())
-			        .property("priorityReason", new StringProperty());
+			        .property("status", new StringProperty()).property("datePicked", new DateProperty())
+			        .property("dateCompleted", new DateProperty());
 		}
 		if (rep instanceof DefaultRepresentation) {
 			model.property("patient", new RefProperty("#/definitions/PatientCreate"))
@@ -370,6 +330,7 @@ public class PatientQueueResource extends DelegatingCrudResource<PatientQueue> {
 			        .property("locationFrom", new RefProperty("#/definitions/LocationCreate"))
 			        .property("locationTo", new RefProperty("#/definitions/LocationCreate"))
 			        .property("encounter", new RefProperty("#/definitions/EncounterCreate"));
+			
 		} else if (rep instanceof FullRepresentation) {
 			model.property("patient", new RefProperty("#/definitions/PatientCreate"))
 			        .property("creator", new RefProperty("#/definitions/UserCreate"))
@@ -385,102 +346,17 @@ public class PatientQueueResource extends DelegatingCrudResource<PatientQueue> {
 	
 	@Override
 	public Model getUPDATEModel(Representation rep) {
-		return new ModelImpl().property("status", new StringProperty()).property("priority", new IntegerProperty())
-		        .property("priorityComment", new StringProperty()).property("comment", new StringProperty())
-		        .property("encounter", new StringProperty()).property("datePicked", new DateProperty())
+		return new ModelImpl()
+				.property("status", new StringProperty())
+				.property("priority", new IntegerProperty())
+		        .property("priorityComment", new StringProperty())
+				.property("comment", new StringProperty())
+				.property("encounter", new StringProperty())
+		        .property("status", new StringProperty())
+				.property("datePicked", new DateProperty())
 		        .property("dateCompleted", new DateProperty())
 		        .property("provider", new RefProperty("#/definitions/ProviderCreate"))
-		        .property("voided", new BooleanProperty()).property("ticketNumber", new StringProperty())
-		        .property("checkedInAt", new DateProperty()).property("calledAt", new DateProperty())
-		        .property("startedAt", new DateProperty()).property("endedAt", new DateProperty())
-		        .property("priorityScore", new IntegerProperty()).property("priorityReason", new StringProperty());
-	}
-	
-	// ----------------- status helpers -----------------
-	
-	private String normalizeStatus(String status) {
-		if (status == null)
-			return null;
-		String s = status.trim().toLowerCase();
-		return s.replace('-', '_').replace(' ', '_');
-	}
-	
-	private PatientQueue.Status mapToQueueStatus(String normalized) {
-		if (normalized == null || normalized.trim().isEmpty())
-			return null;
-		
-		// Legacy
-		if ("pending".equals(normalized))
-			return PatientQueue.Status.PENDING;
-		if ("picked".equals(normalized))
-			return PatientQueue.Status.PICKED;
-		if ("completed".equals(normalized))
-			return PatientQueue.Status.COMPLETED;
-		
-		// New
-		if ("waiting".equals(normalized))
-			return PatientQueue.Status.WAITING;
-		if ("present".equals(normalized) || "checked_in".equals(normalized) || "checkedin".equals(normalized))
-			return PatientQueue.Status.PRESENT;
-		if ("called".equals(normalized))
-			return PatientQueue.Status.CALLED;
-		if ("in_service".equals(normalized) || "inservice".equals(normalized))
-			return PatientQueue.Status.IN_SERVICE;
-		if ("no_show".equals(normalized) || "noshow".equals(normalized))
-			return PatientQueue.Status.NO_SHOW;
-		if ("skipped".equals(normalized))
-			return PatientQueue.Status.SKIPPED;
-		if ("cancelled".equals(normalized) || "canceled".equals(normalized))
-			return PatientQueue.Status.CANCELLED;
-		
-		return null;
-	}
-	
-	private void applyStatusAndTimestamps(PatientQueue pq, String normalizedStatus) {
-		PatientQueue.Status mapped = mapToQueueStatus(normalizedStatus);
-		if (mapped == null)
-			return;
-		
-		pq.setStatus(mapped);
-		Date now = new Date();
-		
-		// Legacy alignment
-		if (mapped == PatientQueue.Status.PICKED) {
-			if (pq.getDatePicked() == null)
-				pq.setDatePicked(now);
-			if (pq.getCalledAt() == null)
-				pq.setCalledAt(pq.getDatePicked());
-			return;
-		}
-		
-		if (mapped == PatientQueue.Status.COMPLETED) {
-			if (pq.getDateCompleted() == null)
-				pq.setDateCompleted(now);
-			if (pq.getEndedAt() == null)
-				pq.setEndedAt(pq.getDateCompleted());
-			return;
-		}
-		
-		if (mapped == PatientQueue.Status.PENDING) {
-			pq.setDatePicked(null);
-			pq.setDateCompleted(null);
-			pq.setCalledAt(null);
-			pq.setStartedAt(null);
-			pq.setEndedAt(null);
-			return;
-		}
-		
-		// New timestamps
-		if (mapped == PatientQueue.Status.PRESENT && pq.getCheckedInAt() == null) {
-			pq.setCheckedInAt(now);
-		} else if (mapped == PatientQueue.Status.CALLED && pq.getCalledAt() == null) {
-			pq.setCalledAt(now);
-			if (pq.getDatePicked() == null)
-				pq.setDatePicked(now);
-		} else if (mapped == PatientQueue.Status.IN_SERVICE && pq.getStartedAt() == null) {
-			pq.setStartedAt(now);
-			if (pq.getDatePicked() == null)
-				pq.setDatePicked(now);
-		}
+				.property("voided", new BooleanProperty())
+				.property("queueRoom", new BooleanProperty());
 	}
 }

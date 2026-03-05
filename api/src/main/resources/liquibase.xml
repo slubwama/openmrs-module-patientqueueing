@@ -312,4 +312,20 @@
                 constraintName="fk_pqe_voided_by"/>
 
     </changeSet>
+
+
+<changeSet author="slubwama" id="patientqueue_20260304-1_add_date_cancelled">
+    <preConditions onFail="MARK_RAN">
+        <and>
+            <tableExists tableName="patient_queue"/>
+            <not>
+                <columnExists tableName="patient_queue" columnName="date_cancelled"/>
+            </not>
+        </and>
+    </preConditions>
+    <addColumn tableName="patient_queue">
+        <column name="date_cancelled" type="datetime"/>
+    </addColumn>
+</changeSet>
+
 </databaseChangeLog>
