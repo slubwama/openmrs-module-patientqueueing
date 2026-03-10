@@ -26,7 +26,6 @@ import org.springframework.stereotype.Repository;
 
 import java.util.Date;
 import java.util.List;
-import java.util.Set;
 
 @Repository("patientqueueing.PatientQueueingDao")
 public class PatientQueueingDao {
@@ -188,7 +187,8 @@ public class PatientQueueingDao {
 	 *      org.openmrs.module.patientqueueing.model.PatientQueue.Status,java.util.Date dateFrom,
 	 *      java.util.Date)
 	 */
-	public List<PatientQueue> getPatientsInQueueRoom(List<Location> queueRooms, PatientQueue.Status status, Date fromDate, Date toDate) {
+	public List<PatientQueue> getPatientsInQueueRoom(List<Location> queueRooms, PatientQueue.Status status, Date fromDate,
+	        Date toDate) {
 		Criteria criteria = getSession().createCriteria(PatientQueue.class);
 		
 		if (fromDate != null && toDate != null) {
@@ -215,7 +215,7 @@ public class PatientQueueingDao {
 	/**
 	 * Find a queue entry by its ticket number (or legacy visit number) within a date range.
 	 */
-	public List<PatientQueue> getPatientQueuesByTicketNumber(String visitNumber, Date fromDate, Date toDate) {
+	public List<PatientQueue> getPatientQueueByVisitNumber(String visitNumber, Date fromDate, Date toDate) {
 		Criteria criteria = getSession().createCriteria(PatientQueue.class);
 		
 		if (fromDate != null && toDate != null) {
