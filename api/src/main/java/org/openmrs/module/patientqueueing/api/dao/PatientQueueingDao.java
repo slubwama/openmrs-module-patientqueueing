@@ -187,8 +187,7 @@ public class PatientQueueingDao {
 	 *      org.openmrs.module.patientqueueing.model.PatientQueue.Status,java.util.Date dateFrom,
 	 *      java.util.Date)
 	 */
-	public List<PatientQueue> getPatientsInQueueRoom(List<Location> queueRooms, PatientQueue.Status status, Date fromDate,
-	        Date toDate) {
+	public List<PatientQueue> getPatientsInQueueRoom(List<Location> queueRooms, PatientQueue.Status status, Date fromDate, Date toDate) {
 		Criteria criteria = getSession().createCriteria(PatientQueue.class);
 		
 		if (fromDate != null && toDate != null) {
@@ -210,63 +209,6 @@ public class PatientQueueingDao {
 	public PatientQueueEvent savePatientQueueEvent(PatientQueueEvent event) {
 		sessionFactory.getCurrentSession().saveOrUpdate(event);
 		return event;
-	}
-	
-	/**
-	 * Find a queue entry by its ticket number (or legacy visit number) within a date range.
-	 */
-	public List<PatientQueue> getPatientQueueByVisitNumber(String visitNumber, Date fromDate, Date toDate) {
-		Criteria criteria = getSession().createCriteria(PatientQueue.class);
-		
-		if (fromDate != null && toDate != null) {
-			criteria.add(Restrictions.between("dateCreated", fromDate, toDate));
-		}
-		
-		criteria.add(Restrictions.eq("visitNumber", visitNumber));
-		criteria.add(Restrictions.ne("status", PatientQueue.Status.CANCELLED));
-		
-		// newest first so callers can easily pick latest movement if they want
-		criteria.addOrder(Order.desc("dateCreated"));
-		
-		return criteria.list();
-	}
-	
-	public List<PatientQueue> getPatientQueueListFifo(Provider provider, Date fromDate, Date toDate, Location locationTo,
-	        Location locationFrom, Patient patient, PatientQueue.Status status, Location queueRoom) {
-		Criteria criteria = getSession().createCriteria(PatientQueue.class);
-		
-		if (fromDate != null && toDate != null)
-			criteria.add(Restrictions.between("dateCreated", fromDate, toDate));
-		if (provider != null)
-			criteria.add(Restrictions.eq("provider", provider));
-		if (locationTo != null)
-			criteria.add(Restrictions.eq("locationTo", locationTo));
-		if (locationFrom != null)
-			criteria.add(Restrictions.eq("locationFrom", locationFrom));
-		if (patient != null)
-			criteria.add(Restrictions.eq("patient", patient));
-		if (status != null)
-			criteria.add(Restrictions.eq("status", status));
-		if (queueRoom != null)
-			criteria.add(Restrictions.eq("queueRoom", queueRoom));
-		
-		criteria.addOrder(Order.asc("dateCreated")); // FIFO
-		return criteria.list();
-	}
-	
-	public List<PatientQueue> getPatientsInQueueRoomFifo(List<Location> queueRooms, PatientQueue.Status status,
-	        Date fromDate, Date toDate) {
-		Criteria criteria = getSession().createCriteria(PatientQueue.class);
-		
-		if (fromDate != null && toDate != null)
-			criteria.add(Restrictions.between("dateCreated", fromDate, toDate));
-		if (status != null)
-			criteria.add(Restrictions.eq("status", status));
-		if (queueRooms != null)
-			criteria.add(Restrictions.in("queueRoom", queueRooms));
-		
-		criteria.addOrder(Order.asc("dateCreated")); // FIFO
-		return criteria.list();
 	}
 	
 }
