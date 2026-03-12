@@ -224,22 +224,36 @@ public class PatientQueueingDao {
 	        Location locationFrom, Patient patient, PatientQueue.Status status, Location queueRoom) {
 		Criteria criteria = getSession().createCriteria(PatientQueue.class);
 		
-		if (fromDate != null && toDate != null)
+		if (fromDate != null && toDate != null) {
 			criteria.add(Restrictions.between("dateCreated", fromDate, toDate));
-		if (provider != null)
+		}
+
+		if (provider != null) {
 			criteria.add(Restrictions.eq("provider", provider));
-		if (locationTo != null)
+		}
+
+		if (locationTo != null) {
 			criteria.add(Restrictions.eq("locationTo", locationTo));
-		if (locationFrom != null)
+		}
+
+		if (locationFrom != null) {
 			criteria.add(Restrictions.eq("locationFrom", locationFrom));
-		if (patient != null)
+		}
+
+		if (patient != null) {
 			criteria.add(Restrictions.eq("patient", patient));
-		if (status != null)
+
+		}
+
+		if (status != null){
 			criteria.add(Restrictions.eq("status", status));
-		if (queueRoom != null)
+		}
+
+		if (queueRoom != null) {
 			criteria.add(Restrictions.eq("queueRoom", queueRoom));
+		}
 		
-		criteria.addOrder(Order.asc("dateCreated")); // FIFO
+		criteria.addOrder(Order.asc("dateCreated"));
 		return criteria.list();
 	}
 	
@@ -247,14 +261,19 @@ public class PatientQueueingDao {
 	        Date fromDate, Date toDate) {
 		Criteria criteria = getSession().createCriteria(PatientQueue.class);
 		
-		if (fromDate != null && toDate != null)
+		if (fromDate != null && toDate != null) {
 			criteria.add(Restrictions.between("dateCreated", fromDate, toDate));
-		if (status != null)
+		}
+
+		if (status != null) {
 			criteria.add(Restrictions.eq("status", status));
-		if (queueRooms != null)
+		}
+
+		if (queueRooms != null) {
 			criteria.add(Restrictions.in("queueRoom", queueRooms));
+		}
 		
-		criteria.addOrder(Order.asc("dateCreated")); // FIFO
+		criteria.addOrder(Order.asc("dateCreated"));
 		return criteria.list();
 	}
 	
