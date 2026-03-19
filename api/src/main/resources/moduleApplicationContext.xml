@@ -52,7 +52,13 @@
             <list>
                 <value>org.openmrs.module.patientqueueing.api.PatientQueueingService</value>
                 <ref bean="patientqueueing.PatientQueueingService"/>
+                <value>org.openmrs.module.patientqueueing.api.ProviderAssignmentService</value>
+                <ref bean="patientqueueing.ProviderAssignmentService"/>
             </list>
         </property>
     </bean>
+
+    <!-- ProviderAssignmentService - no transactions needed as it's read-only -->
+    <bean id="patientqueueing.ProviderAssignmentService"
+          class="org.openmrs.module.patientqueueing.api.impl.ProviderAssignmentServiceImpl"/>
 </beans>

@@ -1,0 +1,240 @@
+package org.openmrs.module.patientqueueing.web.resource;
+
+import org.openmrs.Concept;
+import org.openmrs.Location;
+import org.openmrs.Patient;
+import org.openmrs.api.APIException;
+import org.openmrs.api.context.Context;
+import org.openmrs.module.patientqueueing.api.PatientQueueingService;
+import org.openmrs.module.patientqueueing.customdto.CheckInResult;
+import org.openmrs.module.patientqueueing.customdto.QueueEntry;
+import org.openmrs.module.patientqueueing.model.NonPatientQueue;
+import org.openmrs.module.patientqueueing.model.PatientQueue;
+import org.openmrs.module.webservices.rest.web.RequestContext;
+import org.openmrs.module.webservices.rest.web.RestConstants;
+import org.openmrs.module.webservices.rest.web.annotation.Resource;
+import org.openmrs.util.OpenmrsUtil;
+
+import java.util.Date;
+import java.util.List;
+import java.util.UUID;
+
+/**
+ * REST resource for self check-in Handles both patient and non-patient check-ins
+ */
+@Resource(name = RestConstants.VERSION_1 + "/patientqueueing/checkin", supportedClass = CheckInResult.class, supportedOpenmrsVersions = { "1.9.* - 9.*" })
+public class CheckInResource {
+	
+	/**
+	 * Perform self check-in for a patient
+	 * 
+	 * @param context the request context
+	 * @return CheckInResult with visit, queue entry, and ticket information
+	 */
+	public CheckInResult checkInPatient(RequestContext context) {
+		PatientQueueingService service = Context.getService(PatientQueueingService.class);
+		
+		// Get parameters
+		String patientUuid = context.getParameter("patient");
+		String locationUuid = context.getParameter("location");
+		String queueRoomUuid = context.getParameter("queueRoom");
+		
+		// Validate required parameters
+		if (patientUuid == null || patientUuid.isEmpty()) {
+			return new CheckInResult("patient parameter is required");
+		}
+		
+		if (locationUuid == null || locationUuid.isEmpty()) {
+			return new CheckInResult("location parameter is required");
+		}
+		
+		// Get patient
+		Patient patient = Context.getPatientService().getPatientByUuid(patientUuid);
+		if (patient == null) {
+			return new CheckInResult("Patient not found");
+		}
+		
+		// Get location
+		Location location = Context.getLocationService().getLocationByUuid(locationUuid);
+		if (location == null) {
+			return new CheckInResult("Location not found");
+		}
+		
+		// Get queue room (optional)
+		Location queueRoom = null;
+		if (queueRoomUuid != null && !queueRoomUuid.isEmpty()) {
+			queueRoom = Context.getLocationService().getLocationByUuid(queueRoomUuid);
+			if (queueRoom == null) {
+				return new CheckInResult("Queue room not found");
+			}
+		}
+		
+		try {
+			// Create patient queue entry
+			PatientQueue patientQueue = new PatientQueue();
+			patientQueue.setPatient(patient);
+			patientQueue.setLocationTo(location);
+			patientQueue.setQueueRoom(queueRoom);
+			patientQueue.setStatus(PatientQueue.Status.PENDING);
+			patientQueue.setDateCreated(new Date());
+			
+			// Generate visit number (ticket number)
+			String visitNumber = service.generateVisitNumber(location, patient);
+			patientQueue.setVisitNumber(visitNumber);
+			
+			// Save the queue entry
+			patientQueue = service.savePatientQue(patientQueue);
+			
+			// Calculate queue position
+			int queuePosition = calculatePatientQueuePosition(service, location, queueRoom);
+			
+			// Calculate estimated wait time (5 minutes per person ahead)
+			int estimatedWaitMinutes = queuePosition * 5;
+			
+			// Create result
+			CheckInResult result = new CheckInResult();
+			result.setPatient(patient);
+			result.setQueueEntry(new QueueEntry(patientQueue));
+			result.setTicketNumber(patientQueue.getVisitNumber());
+			result.setQueuePosition(queuePosition);
+			result.setEstimatedWaitMinutes(estimatedWaitMinutes);
+			result.setSuccess(true);
+			
+			return result;
+		}
+		catch (APIException e) {
+			return new CheckInResult("Check-in failed: " + e.getMessage());
+		}
+		catch (Exception e) {
+			return new CheckInResult("Check-in failed: " + e.getMessage());
+		}
+	}
+	
+	/**
+	 * Perform self check-in for a non-patient
+	 * 
+	 * @param context the request context
+	 * @return CheckInResult with queue entry and ticket information
+	 */
+	public CheckInResult checkInNonPatient(RequestContext context) {
+		PatientQueueingService service = Context.getService(PatientQueueingService.class);
+		
+		// Get parameters
+		String displayName = context.getParameter("displayName");
+		String phoneNumber = context.getParameter("phoneNumber");
+		String queueTypeUuid = context.getParameter("queueType");
+		String locationUuid = context.getParameter("location");
+		String queueRoomUuid = context.getParameter("queueRoom");
+		
+		// Validate required parameters
+		if (displayName == null || displayName.isEmpty()) {
+			return new CheckInResult("displayName parameter is required");
+		}
+		
+		if (locationUuid == null || locationUuid.isEmpty()) {
+			return new CheckInResult("location parameter is required");
+		}
+		
+		// Get location
+		Location location = Context.getLocationService().getLocationByUuid(locationUuid);
+		if (location == null) {
+			return new CheckInResult("Location not found");
+		}
+		
+		// Get queue room (optional)
+		Location queueRoom = null;
+		if (queueRoomUuid != null && !queueRoomUuid.isEmpty()) {
+			queueRoom = Context.getLocationService().getLocationByUuid(queueRoomUuid);
+			if (queueRoom == null) {
+				return new CheckInResult("Queue room not found");
+			}
+		}
+		
+		// Get queue type (optional)
+		Concept queueType = null;
+		if (queueTypeUuid != null && !queueTypeUuid.isEmpty()) {
+			queueType = Context.getConceptService().getConceptByUuid(queueTypeUuid);
+			if (queueType == null) {
+				return new CheckInResult("Queue type concept not found");
+			}
+		}
+		
+		try {
+			// Generate ticket number
+			String ticketNumber = service.generateNonPatientQueueTicketNumber(location, queueType);
+			
+			// Create non-patient queue entry
+			NonPatientQueue nonPatientQueue = new NonPatientQueue();
+			nonPatientQueue.setUuid(UUID.randomUUID().toString());
+			nonPatientQueue.setDisplayName(displayName);
+			nonPatientQueue.setPhoneNumber(phoneNumber);
+			nonPatientQueue.setQueueType(queueType);
+			nonPatientQueue.setCurrentLocation(location);
+			nonPatientQueue.setLocationTo(location);
+			nonPatientQueue.setQueueRoom(queueRoom);
+			nonPatientQueue.setStatus(NonPatientQueue.NonPatientQueueStatus.WAITING);
+			nonPatientQueue.setTicketNumber(ticketNumber);
+			nonPatientQueue.setDateCreated(new Date());
+			
+			// Save the queue entry
+			nonPatientQueue = service.saveNonPatientQueue(nonPatientQueue);
+			
+			// Calculate queue position
+			int queuePosition = calculateNonPatientQueuePosition(service, location, queueRoom);
+			
+			// Calculate estimated wait time (5 minutes per person ahead)
+			int estimatedWaitMinutes = queuePosition * 5;
+			
+			// Create result
+			CheckInResult result = new CheckInResult();
+			result.setQueueEntry(new QueueEntry(nonPatientQueue));
+			result.setTicketNumber(nonPatientQueue.getTicketNumber());
+			result.setQueuePosition(queuePosition);
+			result.setEstimatedWaitMinutes(estimatedWaitMinutes);
+			result.setSuccess(true);
+			
+			return result;
+		}
+		catch (APIException e) {
+			return new CheckInResult("Check-in failed: " + e.getMessage());
+		}
+		catch (Exception e) {
+			return new CheckInResult("Check-in failed: " + e.getMessage());
+		}
+	}
+	
+	/**
+	 * Calculate queue position for patient
+	 */
+	private int calculatePatientQueuePosition(PatientQueueingService service, Location location, Location queueRoom) {
+		Date today = new Date();
+		Date fromDate = OpenmrsUtil.firstSecondOfDay(today);
+		Date toDate = OpenmrsUtil.getLastMomentOfDay(today);
+		
+		List<PatientQueue> queues = service.getPatientQueueList(null, fromDate, toDate, null, null, null,
+		    PatientQueue.Status.PENDING, queueRoom);
+		
+		int position = 0;
+		for (PatientQueue q : queues) {
+			if (location.equals(q.getLocationTo()) || location.equals(q.getQueueRoom())) {
+				position++;
+			}
+		}
+		
+		return position + 1;
+	}
+	
+	/**
+	 * Calculate queue position for non-patient
+	 */
+	private int calculateNonPatientQueuePosition(PatientQueueingService service, Location location, Location queueRoom) {
+		Date today = new Date();
+		Date fromDate = OpenmrsUtil.firstSecondOfDay(today);
+		Date toDate = OpenmrsUtil.getLastMomentOfDay(today);
+		
+		List<NonPatientQueue> queues = service.getNonPatientQueues(NonPatientQueue.NonPatientQueueStatus.WAITING, null,
+		    location, queueRoom, fromDate, toDate);
+		
+		return queues.size();
+	}
+}
