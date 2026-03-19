@@ -189,44 +189,43 @@ public class PatientQueueingDao {
 	 *      org.openmrs.module.patientqueueing.model.PatientQueue.Status,java.util.Date dateFrom,
 	 *      java.util.Date)
 	 */
-	public List<PatientQueue> getPatientsInQueueRoom(List<Location> queueRooms, PatientQueue.Status status, Date fromDate,
-	        Date toDate) {
+	public List<PatientQueue> getPatientsInQueueRoom(List<Location> queueRooms, PatientQueue.Status status, Date fromDate, Date toDate) {
 		Criteria criteria = getSession().createCriteria(PatientQueue.class);
-
+		
 		if (fromDate != null && toDate != null) {
 			criteria.add(Restrictions.between("dateCreated", fromDate, toDate));
 		}
-
+		
 		if (status != null) {
 			criteria.add(Restrictions.eq("status", status));
 		}
-
+		
 		if (queueRooms != null) {
 			criteria.add(Restrictions.in("queueRoom", queueRooms));
 		}
-
+		
 		criteria.addOrder(Order.desc("dateCreated"));
 		return criteria.list();
 	}
-
+	
 	public List<PatientQueue> getPatientQueueByVisitNumber(String visitNumber, Date fromDate, Date toDate) {
 		Criteria criteria = getSession().createCriteria(PatientQueue.class);
-
+		
 		if (fromDate != null && toDate != null) {
 			criteria.add(Restrictions.between("dateCreated", fromDate, toDate));
 		}
-
+		
 		criteria.add(Restrictions.eq("visitNumber", visitNumber));
-
+		
 		criteria.addOrder(Order.desc("dateCreated"));
-
+		
 		return criteria.list();
 	}
-
+	
 	public List<PatientQueue> getPatientQueueListFifo(Provider provider, Date fromDate, Date toDate, Location locationTo,
 	        Location locationFrom, Patient patient, PatientQueue.Status status, Location queueRoom) {
 		Criteria criteria = getSession().createCriteria(PatientQueue.class);
-
+		
 		if (fromDate != null && toDate != null) {
 			criteria.add(Restrictions.between("dateCreated", fromDate, toDate));
 		}
@@ -267,11 +266,11 @@ public class PatientQueueingDao {
 		if (fromDate != null && toDate != null) {
 			criteria.add(Restrictions.between("dateCreated", fromDate, toDate));
 		}
-		
+
 		if (status != null) {
 			criteria.add(Restrictions.eq("status", status));
 		}
-		
+
 		if (queueRooms != null) {
 			criteria.add(Restrictions.in("queueRoom", queueRooms));
 		}
