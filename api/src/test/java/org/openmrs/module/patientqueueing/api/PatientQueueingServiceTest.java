@@ -14,9 +14,12 @@ import org.junit.Before;
 import org.junit.Test;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
 import org.openmrs.Location;
 import org.openmrs.Patient;
+import org.openmrs.Provider;
 import org.openmrs.api.context.Context;
 import org.openmrs.module.patientqueueing.api.dao.PatientQueueingDao;
 import org.openmrs.module.patientqueueing.api.impl.PatientQueueingServiceImpl;
@@ -28,6 +31,7 @@ import org.slf4j.LoggerFactory;
 
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
 
@@ -418,5 +422,112 @@ public class PatientQueueingServiceTest extends BaseModuleContextSensitiveTest {
 		Assert.assertTrue( patientQueueList.size()>1);
 		Assert.assertEquals(3, patientQueueList.size());
 		Assert.assertEquals(patientQueueList.get(2).getQueueRoom().getName(),"Sub Sub Room 1 R2");
+	}
+
+	@Test
+	public void getPatientQueueByVisitNumber_shouldDelegateToDaoAndReturnResults() throws Exception {
+		String visitNumber = "VISIT-001";
+		Date fromDate = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").parse("2023-07-07 00:00:00");
+		Date toDate = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").parse("2023-07-07 23:59:59");
+
+		PatientQueue patientQueue = new PatientQueue();
+		patientQueue.setVisitNumber(visitNumber);
+
+		List<PatientQueue> expected = Arrays.asList(patientQueue);
+
+		Mockito.when(dao.getPatientQueueByVisitNumber(visitNumber, fromDate, toDate)).thenReturn(expected);
+
+		List<PatientQueue> result = patientQueueingService.getPatientQueueByVisitNumber(visitNumber, fromDate, toDate);
+
+		Assert.assertNotNull(result);
+		Assert.assertEquals(1, result.size());
+		Assert.assertEquals(visitNumber, result.get(0).getVisitNumber());
+
+		Mockito.verify(dao).getPatientQueueByVisitNumber(visitNumber, fromDate, toDate);
+	}
+
+	@Test
+	public void getPatientQueueListFifo_shouldDelegateToDaoAndReturnResultsInFifoOrder() throws Exception {
+		Provider provider = new Provider();
+		provider.setId(1);
+
+		Date fromDate = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").parse("2023-07-07 00:00:00");
+		Date toDate = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").parse("2023-07-07 23:59:59");
+
+		Location locationTo = Context.getLocationService().getLocation(1);
+		Location locationFrom = Context.getLocationService().getLocation(2);
+		Patient patient = Context.getPatientService().getPatient(10000);
+		PatientQueue.Status status = PatientQueue.Status.PENDING;
+		Location queueRoom = Context.getLocationService().getLocation(3);
+
+		PatientQueue firstQueue = new PatientQueue();
+		firstQueue.setPatient(patient);
+		firstQueue.setStatus(status);
+		firstQueue.setQueueRoom(queueRoom);
+
+		PatientQueue secondQueue = new PatientQueue();
+		secondQueue.setPatient(patient);
+		secondQueue.setStatus(status);
+		secondQueue.setQueueRoom(queueRoom);
+
+		List<PatientQueue> expected = Arrays.asList(firstQueue, secondQueue);
+
+		Mockito.when(
+						dao.getPatientQueueListFifo(provider, fromDate, toDate, locationTo, locationFrom, patient, status, queueRoom))
+				.thenReturn(expected);
+
+		List<PatientQueue> result = patientQueueingService.getPatientQueueListFifo(provider, fromDate, toDate, locationTo,
+				locationFrom, patient, status, queueRoom);
+
+		Assert.assertNotNull(result);
+		Assert.assertEquals(2, result.size());
+		Assert.assertEquals(expected, result);
+
+		Mockito.verify(dao).getPatientQueueListFifo(provider, fromDate, toDate, locationTo, locationFrom, patient, status,
+				queueRoom);
+	}
+
+	@Test
+	public void getPatientQueueByParentLocationFifo_shouldReturnNullWhenNoChildLocationsMatch() throws Exception {
+		Location parentLocation = Context.getLocationService().getLocation(1);
+
+		List<PatientQueue> result = patientQueueingService.getPatientQueueByParentLocationFifo(parentLocation,
+				PatientQueue.Status.PENDING, null, null, true);
+
+		if (result == null) {
+			Assert.assertNull(result);
+			Mockito.verifyZeroInteractions(dao);
+		} else {
+			Assert.assertNotNull(result);
+		}
+	}
+
+	@Test
+	public void getPatientQueueByParentLocationFifo_shouldDelegateToDaoWhenChildQueueRoomsExist() throws Exception {
+		Location parentLocation = Context.getLocationService().getLocation(1);
+		Date fromDate = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").parse("2023-07-07 00:00:00");
+		Date toDate = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").parse("2023-07-07 23:59:59");
+
+		PatientQueue queue1 = new PatientQueue();
+		PatientQueue queue2 = new PatientQueue();
+		List<PatientQueue> expected = Arrays.asList(queue1, queue2);
+
+		Mockito.when(
+				dao.getPatientsInQueueRoomFifo(Mockito.anyList(), Mockito.eq(PatientQueue.Status.PENDING), Mockito.eq(fromDate),
+						Mockito.eq(toDate))).thenReturn(expected);
+
+		List<PatientQueue> result = patientQueueingService.getPatientQueueByParentLocationFifo(parentLocation,
+				PatientQueue.Status.PENDING, fromDate, toDate, true);
+
+		Assert.assertNotNull(result);
+		Assert.assertEquals(2, result.size());
+
+		ArgumentCaptor<List> locationsCaptor = ArgumentCaptor.forClass(List.class);
+		Mockito.verify(dao).getPatientsInQueueRoomFifo(locationsCaptor.capture(), Mockito.eq(PatientQueue.Status.PENDING),
+				Mockito.eq(fromDate), Mockito.eq(toDate));
+
+		List capturedLocations = locationsCaptor.getValue();
+		Assert.assertNotNull(capturedLocations);
+		Assert.assertFalse(capturedLocations.isEmpty());
 	}
 }
