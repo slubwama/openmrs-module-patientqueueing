@@ -27,6 +27,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
+import java.util.Set;
+import java.util.HashSet;
 
 import static org.openmrs.module.patientqueueing.PatientQueueingConfig.ROOM_TAG_UUID;
 
@@ -277,22 +279,52 @@ public class PatientQueueingServiceImpl extends BaseOpenmrsService implements Pa
         }
     }
 
-	private void createAuditEvent(PatientQueue patientQueue, PatientQueueEvent.EventType type, String details) {
-		try {
-			PatientQueueEvent event = new PatientQueueEvent();
-			event.setPatientQueue(patientQueue);
-			event.setEventType(type);
-			event.setEventTime(new Date());
-			event.setActorUser(Context.getAuthenticatedUser());
-			event.setFromQueueLocation(patientQueue.getLocationTo());
-			event.setToQueueLocation(patientQueue.getLocationTo());
-			event.setFromServiceLocation(patientQueue.getQueueRoom());
-			event.setToServiceLocation(patientQueue.getQueueRoom());
-			event.setDetails(details);
-			dao.savePatientQueueEvent(event);
-		}
-		catch (Exception ignore) {
-			// do not block queue ops if audit logging fails
-		}
+    /**
+     * @see org.openmrs.module.patientqueueing.api.PatientQueueingService#getPatientQueueByVisitNumber(java.lang.String, java.util.Date, java.util.Date)
+     */
+	public List<PatientQueue> getPatientQueueByVisitNumber(String visitNumber, Date fromDate, Date toDate) {
+		return dao.getPatientQueueByVisitNumber(visitNumber, fromDate, toDate);
 	}
+
+    /**
+     * @see org.openmrs.module.patientqueueing.api.PatientQueueingService#getPatientQueueListFifo(org.openmrs.Provider, java.util.Date, java.util.Date,org.openmrs.Location,org.openmrs.Location,org.openmrs.Patient,org.openmrs.module.patientqueueing.model.PatientQueue.Status,org.openmrs.Location)
+     */
+	public List<PatientQueue> getPatientQueueListFifo(Provider provider, Date fromDate, Date toDate, Location locationTo,
+													  Location locationFrom, Patient patient, PatientQueue.Status status, Location queueRoom) {
+		return dao.getPatientQueueListFifo(provider, fromDate, toDate, locationTo, locationFrom, patient, status, queueRoom);
+	}
+
+    /**
+     * @see org.openmrs.module.patientqueueing.api.PatientQueueingService#getPatientQueueByParentLocationFifo(org.openmrs.Location,org.openmrs.module.patientqueueing.model.PatientQueue.Status,java.util.Date, java.util.Date,boolean)
+     */
+	public List<PatientQueue> getPatientQueueByParentLocationFifo(Location parentLocation, PatientQueue.Status status,
+																  Date fromDate, Date toDate, boolean onlyInQueueRooms) {
+		LocationTag queueRomTag = Context.getLocationService().getLocationTagByUuid(ROOM_TAG_UUID);
+		List<Location> childLocations = new ArrayList<>();
+		flattenLocationHierarchy(parentLocation, childLocations, queueRomTag, onlyInQueueRooms);
+
+		if (childLocations.isEmpty()) {
+			return null;
+		}
+		return dao.getPatientsInQueueRoomFifo(childLocations, status, fromDate, toDate);
+	}
+
+    private void createAuditEvent(PatientQueue patientQueue, PatientQueueEvent.EventType type, String details) {
+        try {
+            PatientQueueEvent event = new PatientQueueEvent();
+            event.setPatientQueue(patientQueue);
+            event.setEventType(type);
+            event.setEventTime(new Date());
+            event.setActorUser(Context.getAuthenticatedUser());
+            event.setFromQueueLocation(patientQueue.getLocationTo());
+            event.setToQueueLocation(patientQueue.getLocationTo());
+            event.setFromServiceLocation(patientQueue.getQueueRoom());
+            event.setToServiceLocation(patientQueue.getQueueRoom());
+            event.setDetails(details);
+            dao.savePatientQueueEvent(event);
+        }
+        catch (Exception ignore) {
+            // do not block queue ops if audit logging fails
+        }
+    }
 }

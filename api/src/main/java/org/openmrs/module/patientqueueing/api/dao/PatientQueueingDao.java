@@ -206,9 +206,79 @@ public class PatientQueueingDao {
 		return criteria.list();
 	}
 	
+	public List<PatientQueue> getPatientQueueByVisitNumber(String visitNumber, Date fromDate, Date toDate) {
+		Criteria criteria = getSession().createCriteria(PatientQueue.class);
+
+		if (fromDate != null && toDate != null) {
+			criteria.add(Restrictions.between("dateCreated", fromDate, toDate));
+		}
+
+		criteria.add(Restrictions.eq("visitNumber", visitNumber));
+
+		criteria.addOrder(Order.desc("dateCreated"));
+
+		return criteria.list();
+	}
+
+	public List<PatientQueue> getPatientQueueListFifo(Provider provider, Date fromDate, Date toDate, Location locationTo,
+	        Location locationFrom, Patient patient, PatientQueue.Status status, Location queueRoom) {
+		Criteria criteria = getSession().createCriteria(PatientQueue.class);
+
+		if (fromDate != null && toDate != null) {
+			criteria.add(Restrictions.between("dateCreated", fromDate, toDate));
+		}
+
+		if (provider != null) {
+			criteria.add(Restrictions.eq("provider", provider));
+		}
+
+		if (locationTo != null) {
+			criteria.add(Restrictions.eq("locationTo", locationTo));
+		}
+
+		if (locationFrom != null) {
+			criteria.add(Restrictions.eq("locationFrom", locationFrom));
+		}
+
+		if (patient != null) {
+			criteria.add(Restrictions.eq("patient", patient));
+
+		}
+
+		if (status != null){
+			criteria.add(Restrictions.eq("status", status));
+		}
+
+		if (queueRoom != null) {
+			criteria.add(Restrictions.eq("queueRoom", queueRoom));
+		}
+
+		criteria.addOrder(Order.asc("dateCreated"));
+		return criteria.list();
+	}
+
+	public List<PatientQueue> getPatientsInQueueRoomFifo(List<Location> queueRooms, PatientQueue.Status status,
+	        Date fromDate, Date toDate) {
+		Criteria criteria = getSession().createCriteria(PatientQueue.class);
+
+		if (fromDate != null && toDate != null) {
+			criteria.add(Restrictions.between("dateCreated", fromDate, toDate));
+		}
+
+		if (status != null) {
+			criteria.add(Restrictions.eq("status", status));
+		}
+
+		if (queueRooms != null) {
+			criteria.add(Restrictions.in("queueRoom", queueRooms));
+		}
+
+		criteria.addOrder(Order.asc("dateCreated"));
+		return criteria.list();
+	}
+
 	public PatientQueueEvent savePatientQueueEvent(PatientQueueEvent event) {
 		sessionFactory.getCurrentSession().saveOrUpdate(event);
 		return event;
 	}
-	
 }
