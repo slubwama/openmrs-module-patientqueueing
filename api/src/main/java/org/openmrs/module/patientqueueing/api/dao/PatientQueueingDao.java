@@ -247,7 +247,7 @@ public class PatientQueueingDao {
 
 		}
 
-		if (status != null) {
+		if (status != null){
 			criteria.add(Restrictions.eq("status", status));
 		}
 
@@ -278,6 +278,7 @@ public class PatientQueueingDao {
 		criteria.addOrder(Order.asc("dateCreated"));
 		return criteria.list();
 	}
+
 
 	// ========== Non-Patient Queue DAO Methods ==========
 
