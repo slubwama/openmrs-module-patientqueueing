@@ -15,14 +15,80 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * REST resource for queue kiosk displays Provides unified access to both patient and non-patient
- * queues Supports ticket lookup by ticket number
+ * queues Supports ticket lookup by ticket number Handles both our clean API and
+ * UgandaEMR-compatible requests for backward compatibility
  */
-@Resource(name = RestConstants.VERSION_1 + "/patientqueueing/kiosk", supportedClass = QueueEntry.class, supportedOpenmrsVersions = { "1.9.* - 9.*" })
+@Resource(name = RestConstants.VERSION_1 + "/kiosk", supportedClass = Object.class, supportedOpenmrsVersions = { "1.9.* - 9.*" })
 public class QueueKioskResource {
+	
+	/**
+	 * Main GET method - handles both our clean API and UgandaEMR-compatible requests UgandaEMR
+	 * requests use "visitNumber" parameter and expect wrapped response Our API uses "ticketNumber"
+	 * and returns QueueEntry directly
+	 */
+	public Object get(RequestContext context) {
+		// Detect UgandaEMR request by parameter names
+		String visitNumber = context.getParameter("visitNumber");
+		String ticketNumber = context.getParameter("ticketNumber");
+		
+		if (visitNumber != null) {
+			// UgandaEMR format request - return wrapped response
+			return getKioskStatusUgandaEMRStyle(context);
+		} else {
+			// Our clean API format - return QueueEntry directly
+			return getQueueByTicketNumber(context);
+		}
+	}
+	
+	/**
+	 * UgandaEMR-compatible kiosk status lookup Returns wrapped response with results array
+	 */
+	private Object getKioskStatusUgandaEMRStyle(RequestContext context) {
+		PatientQueueingService service = Context.getService(PatientQueueingService.class);
+		
+		// Support both parameter names for compatibility
+		String visitNumber = context.getParameter("visitNumber");
+		String ticketNumberParam = context.getParameter("ticketNumber");
+		
+		String ticket = (visitNumber != null) ? visitNumber : ticketNumberParam;
+		
+		if (ticket == null || ticket.isEmpty()) {
+			throw new IllegalArgumentException("visitNumber or ticketNumber parameter required");
+		}
+		
+		Date today = new Date();
+		Date fromDate = OpenmrsUtil.firstSecondOfDay(today);
+		Date toDate = OpenmrsUtil.getLastMomentOfDay(today);
+		
+		// Search in PatientQueue
+		List<PatientQueue> patientQueues = service.getPatientQueueByVisitNumber(ticket, fromDate, toDate);
+		
+		// Search in NonPatientQueue
+		List<NonPatientQueue> nonPatientQueues = service.getNonPatientQueueByTicketNumber(ticket, fromDate, toDate);
+		
+		// Combine results into unified list
+		List<Object> results = new ArrayList<Object>();
+		
+		for (PatientQueue pq : patientQueues) {
+			results.add(createKioskStatusFromPatientQueue(pq));
+		}
+		
+		for (NonPatientQueue npq : nonPatientQueues) {
+			results.add(createKioskStatusFromNonPatientQueue(npq));
+		}
+		
+		// Wrap in results array like UgandaEMR
+		Map<String, Object> response = new HashMap<String, Object>();
+		response.put("results", results);
+		
+		return response;
+	}
 	
 	/**
 	 * Search for a queue entry by ticket number This searches both patient and non-patient queues
@@ -215,5 +281,71 @@ public class QueueKioskResource {
 		catch (IllegalArgumentException e) {
 			return null;
 		}
+	}
+	
+	/**
+	 * Create UgandaEMR-compatible kiosk status from PatientQueue
+	 */
+	private Map<String, Object> createKioskStatusFromPatientQueue(PatientQueue pq) {
+		Map<String, Object> status = new HashMap<String, Object>();
+		status.put("uuid", pq.getUuid());
+		status.put("ticketNumber", pq.getVisitNumber());
+		status.put("visitNumber", pq.getVisitNumber());
+		status.put("status", pq.getStatus().name());
+		status.put("queueLocation", pq.getLocationTo() != null ? pq.getLocationTo().getDisplayString() : null);
+		status.put("serviceLocation", pq.getQueueRoom() != null ? pq.getQueueRoom().getDisplayString() : null);
+		status.put("checkedInAt", pq.getDateCreated() != null ? pq.getDateCreated().toString() : null);
+		status.put("datePicked", pq.getDateChanged() != null ? pq.getDateChanged().toString() : null);
+		status.put("dateCreated", pq.getDateCreated() != null ? pq.getDateCreated().toString() : null);
+		status.put("dateCompleted", pq.getStatus() == PatientQueue.Status.COMPLETED ? pq.getDateChanged() != null ? pq
+		        .getDateChanged().toString() : null : null);
+		
+		// Add nested objects like UgandaEMR
+		status.put("locationTo", createLocationRef(pq.getLocationTo()));
+		status.put("queueRoom", createLocationRef(pq.getQueueRoom()));
+		status.put("displayName", pq.getPatient() != null ? pq.getPatient().getPersonName().getFullName() : null);
+		status.put("queueType", "PATIENT");
+		
+		return status;
+	}
+	
+	/**
+	 * Create UgandaEMR-compatible kiosk status from NonPatientQueue
+	 */
+	private Map<String, Object> createKioskStatusFromNonPatientQueue(NonPatientQueue npq) {
+		Map<String, Object> status = new HashMap<String, Object>();
+		status.put("uuid", npq.getUuid());
+		status.put("ticketNumber", npq.getTicketNumber());
+		status.put("status", npq.getStatus().name());
+		status.put("queueLocation", npq.getLocationTo() != null ? npq.getLocationTo().getDisplayString() : null);
+		status.put("serviceLocation", npq.getQueueRoom() != null ? npq.getQueueRoom().getDisplayString() : null);
+		status.put("checkedInAt", npq.getDateCreated() != null ? npq.getDateCreated().toString() : null);
+		status.put("dateCreated", npq.getDateCreated() != null ? npq.getDateCreated().toString() : null);
+		status.put("dateCompleted",
+		    npq.getStatus() == NonPatientQueue.NonPatientQueueStatus.COMPLETED ? npq.getDateChanged() != null ? npq
+		            .getDateChanged().toString() : null : null);
+		status.put("displayName", npq.getDisplayName());
+		status.put("queueType", "NON_PATIENT");
+		
+		// Add nested objects like UgandaEMR
+		status.put("locationTo", createLocationRef(npq.getLocationTo()));
+		status.put("queueRoom", createLocationRef(npq.getQueueRoom()));
+		
+		return status;
+	}
+	
+	/**
+	 * Create location reference object for UgandaEMR compatibility
+	 */
+	private Map<String, Object> createLocationRef(Location location) {
+		if (location == null) {
+			return null;
+		}
+		
+		Map<String, Object> ref = new HashMap<String, Object>();
+		ref.put("uuid", location.getUuid());
+		ref.put("display", location.getDisplayString());
+		ref.put("name", location.getName());
+		return ref;
 	}
 }

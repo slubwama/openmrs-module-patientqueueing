@@ -393,14 +393,14 @@ public class PatientQueueingDao {
 	 * 
 	 * @param status the status to filter by (can be null)
 	 * @param queueType the queue type concept to filter by (can be null)
-	 * @param locationTo the destination location to filter by (can be null)
-	 * @param queueRoom the queue room to filter by (can be null)
+	 * @param locationTo the destination location to filter by (can be null, list for hierarchy)
+	 * @param queueRoom the queue room to filter by (can be null, list for hierarchy)
 	 * @param fromDate the start date for filtering (can be null)
 	 * @param toDate the end date for filtering (can be null)
 	 * @return list of NonPatientQueue entries matching the criteria
 	 */
 	public List<NonPatientQueue> getNonPatientQueues(NonPatientQueue.NonPatientQueueStatus status, Concept queueType,
-	        Location locationTo, Location queueRoom, Date fromDate, Date toDate) {
+	        List<Location> locationTo, List<Location> queueRoom, Date fromDate, Date toDate) {
 		Criteria criteria = getSession().createCriteria(NonPatientQueue.class);
 		
 		if (status != null) {
@@ -411,12 +411,12 @@ public class PatientQueueingDao {
 			criteria.add(Restrictions.eq("queueType", queueType));
 		}
 		
-		if (locationTo != null) {
-			criteria.add(Restrictions.eq("locationTo", locationTo));
+		if (locationTo != null && !locationTo.isEmpty()) {
+			criteria.add(Restrictions.in("locationTo", locationTo));
 		}
 		
-		if (queueRoom != null) {
-			criteria.add(Restrictions.eq("queueRoom", queueRoom));
+		if (queueRoom != null && !queueRoom.isEmpty()) {
+			criteria.add(Restrictions.in("queueRoom", queueRoom));
 		}
 		
 		if (fromDate != null && toDate != null) {
@@ -437,6 +437,41 @@ public class PatientQueueingDao {
 	public NonPatientQueue saveNonPatientQueue(NonPatientQueue nonPatientQueue) {
 		getSession().saveOrUpdate(nonPatientQueue);
 		return nonPatientQueue;
+	}
+	
+	/**
+	 * Get NonPatientQueue entries in multiple locations with FIFO ordering
+	 * 
+	 * @param locations the list of locations to search in
+	 * @param status the queue status to filter by; may be null
+	 * @param queueType the queue type concept to filter by; may be null
+	 * @param fromDate the start date for filtering by creation date; may be null
+	 * @param toDate the end date for filtering by creation date; may be null
+	 * @return a FIFO-ordered list of non-patient queue entries for the given locations
+	 */
+	public List<NonPatientQueue> getNonPatientQueuesInLocationsFifo(List<Location> locations,
+	        NonPatientQueue.NonPatientQueueStatus status, Concept queueType, Date fromDate, Date toDate) {
+		Criteria criteria = getSession().createCriteria(NonPatientQueue.class);
+		
+		if (status != null) {
+			criteria.add(Restrictions.eq("status", status));
+		}
+		
+		if (queueType != null) {
+			criteria.add(Restrictions.eq("queueType", queueType));
+		}
+		
+		if (locations != null && !locations.isEmpty()) {
+			criteria.add(Restrictions.in("locationTo", locations));
+		}
+		
+		if (fromDate != null && toDate != null) {
+			criteria.add(Restrictions.between("dateCreated", fromDate, toDate));
+		}
+		
+		criteria.addOrder(Order.asc("dateCreated"));
+		
+		return criteria.list();
 	}
 	
 }

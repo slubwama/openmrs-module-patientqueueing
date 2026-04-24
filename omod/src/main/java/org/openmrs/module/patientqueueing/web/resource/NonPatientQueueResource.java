@@ -48,7 +48,11 @@ public class NonPatientQueueResource extends DelegatingCrudResource<NonPatientQu
 	@Override
 	public NonPatientQueue save(NonPatientQueue nonPatientQueue) {
 		PatientQueueingService service = Context.getService(PatientQueueingService.class);
-		return service.saveNonPatientQueue(nonPatientQueue);
+		
+		// Use createNonPatientQueueEntry to ensure ticket number generation and proper status setting
+		return service.createNonPatientQueueEntry(nonPatientQueue.getDisplayName(), nonPatientQueue.getPhoneNumber(),
+		    nonPatientQueue.getQueueType(), nonPatientQueue.getCurrentLocation(), nonPatientQueue.getLocationTo(),
+		    nonPatientQueue.getQueueRoom(), nonPatientQueue.getPriority(), nonPatientQueue.getComment());
 	}
 	
 	@Override

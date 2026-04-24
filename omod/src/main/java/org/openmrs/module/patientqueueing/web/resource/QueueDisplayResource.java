@@ -1,278 +1,317 @@
+/**
+ * This Source Code Form is subject to the terms of the Mozilla Public License,
+ * v. 2.0. If a copy of the MPL was not distributed with this file, You can
+ * obtain one at http://mozilla.org/MPL/2.0/. OpenMRS is also distributed under
+ * the terms of the Healthcare Disclaimer located at http://openmrs.org/license.
+ * <p>
+ * Copyright (C) OpenMRS Inc. OpenMRS is a registered trademark and the OpenMRS
+ * graphic logo is a trademark of OpenMRS Inc.
+ */
 package org.openmrs.module.patientqueueing.web.resource;
 
 import org.openmrs.Location;
 import org.openmrs.api.context.Context;
 import org.openmrs.module.patientqueueing.api.PatientQueueingService;
-import org.openmrs.module.patientqueueing.customdto.QueueEntry;
+import org.openmrs.module.patientqueueing.customdto.QueueDisplayContextDto;
+import org.openmrs.module.patientqueueing.customdto.QueueDisplayDto;
+import org.openmrs.module.patientqueueing.customdto.QueueDisplayRowDto;
+import org.openmrs.module.patientqueueing.customdto.QueueDisplayStatsDto;
 import org.openmrs.module.patientqueueing.model.NonPatientQueue;
 import org.openmrs.module.patientqueueing.model.PatientQueue;
 import org.openmrs.module.webservices.rest.web.RequestContext;
 import org.openmrs.module.webservices.rest.web.RestConstants;
 import org.openmrs.module.webservices.rest.web.annotation.Resource;
+import org.openmrs.module.webservices.rest.web.representation.DefaultRepresentation;
+import org.openmrs.module.webservices.rest.web.representation.FullRepresentation;
+import org.openmrs.module.webservices.rest.web.representation.Representation;
+import org.openmrs.module.webservices.rest.web.resource.api.PageableResult;
+import org.openmrs.module.webservices.rest.web.resource.impl.DelegatingCrudResource;
+import org.openmrs.module.webservices.rest.web.resource.impl.DelegatingResourceDescription;
+import org.openmrs.module.webservices.rest.web.response.ResourceDoesNotSupportOperationException;
+import org.openmrs.module.webservices.rest.web.response.ResponseException;
 import org.openmrs.util.OpenmrsUtil;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 /**
- * REST resource for public queue displays Provides unified view of both patient and non-patient
- * queues Displays "now serving" and "up next" information
+ * Patient-facing Queue Display feed (computed DTO). GET
+ * /ws/rest/v1/display?type=facility|location|room&uuid=<locationUuid>&date=today|YYYY-MM-DD NOTE:
+ * Query-params are treated as SEARCH by OpenMRS REST -> doSearch(...) must be implemented. Follows
+ * UgandaEMR QueueDisplayResource pattern for clean, maintainable code.
  */
-@Resource(name = RestConstants.VERSION_1 + "/patientqueueing/display", supportedClass = QueueEntry.class, supportedOpenmrsVersions = { "1.9.* - 9.*" })
-public class QueueDisplayResource {
+@Resource(name = RestConstants.VERSION_1 + "/display", supportedClass = QueueDisplayDto.class, supportedOpenmrsVersions = { "1.9.* - 9.*" })
+public class QueueDisplayResource extends DelegatingCrudResource<QueueDisplayDto> {
 	
-	/**
-	 * Get queue display data for a specific location Returns now serving, up next, and statistics
-	 * 
-	 * @param context the request context
-	 * @return map containing display data
-	 */
-	public Map<String, Object> getDisplayData(RequestContext context) {
-		PatientQueueingService service = Context.getService(PatientQueueingService.class);
-		
-		String locationUuid = context.getParameter("location");
-		String queueRoomUuid = context.getParameter("queueRoom");
-		String dateFromParam = context.getParameter("dateFrom");
-		String dateToParam = context.getParameter("dateTo");
-		
-		// Parse date parameters
-		Date fromDate;
-		Date toDate;
-		
-		if (dateFromParam != null && !dateFromParam.isEmpty()) {
-			try {
-				fromDate = new Date(Long.parseLong(dateFromParam));
-			}
-			catch (NumberFormatException e) {
-				fromDate = OpenmrsUtil.firstSecondOfDay(new Date());
-			}
-		} else {
-			fromDate = OpenmrsUtil.firstSecondOfDay(new Date());
-		}
-		
-		if (dateToParam != null && !dateToParam.isEmpty()) {
-			try {
-				toDate = new Date(Long.parseLong(dateToParam));
-			}
-			catch (NumberFormatException e) {
-				toDate = OpenmrsUtil.getLastMomentOfDay(new Date());
-			}
-		} else {
-			toDate = OpenmrsUtil.getLastMomentOfDay(new Date());
-		}
-		
-		Location location = null;
-		Location queueRoom = null;
-		
-		if (locationUuid != null && !locationUuid.isEmpty()) {
-			location = Context.getLocationService().getLocationByUuid(locationUuid);
-			if (location == null) {
-				throw new IllegalArgumentException("Location not found: " + locationUuid);
-			}
-		}
-		
-		if (queueRoomUuid != null && !queueRoomUuid.isEmpty()) {
-			queueRoom = Context.getLocationService().getLocationByUuid(queueRoomUuid);
-			if (queueRoom == null) {
-				throw new IllegalArgumentException("Queue room not found: " + queueRoomUuid);
-			}
-		}
-		
-		// Get all queues for the location
-		List<QueueEntry> allEntries = new ArrayList<QueueEntry>();
-		
-		// Get patient queues
-		List<PatientQueue> patientQueues = service.getPatientQueueList(null, fromDate, toDate, null, null, null,
-		    PatientQueue.Status.PENDING, queueRoom);
-		
-		for (PatientQueue pq : patientQueues) {
-			if (location == null || (location.equals(pq.getLocationTo()) || location.equals(pq.getQueueRoom()))) {
-				allEntries.add(new QueueEntry(pq));
-			}
-		}
-		
-		// Get non-patient queues
-		List<NonPatientQueue> nonPatientQueues = service.getNonPatientQueues(NonPatientQueue.NonPatientQueueStatus.WAITING,
-		    null, location, queueRoom, fromDate, toDate);
-		
-		for (NonPatientQueue npq : nonPatientQueues) {
-			allEntries.add(new QueueEntry(npq));
-		}
-		
-		// Get now serving (CALLED, ARRIVED, SERVING status)
-		List<QueueEntry> nowServing = new ArrayList<QueueEntry>();
-		
-		// Patient queues - now serving
-		List<PatientQueue> patientServing = service.getPatientQueueList(null, fromDate, toDate, null, null, null,
-		    PatientQueue.Status.PICKED, queueRoom);
-		for (PatientQueue pq : patientServing) {
-			if (location == null || (location.equals(pq.getLocationTo()) || location.equals(pq.getQueueRoom()))) {
-				nowServing.add(new QueueEntry(pq));
-			}
-		}
-		
-		// Non-patient queues - now serving (CALLED, ARRIVED, SERVING)
-		List<NonPatientQueue> nonPatientServing = service.getNonPatientQueues(null, null, location, queueRoom, fromDate,
-		    toDate);
-		for (NonPatientQueue npq : nonPatientServing) {
-			if (npq.getStatus() == NonPatientQueue.NonPatientQueueStatus.CALLED
-			        || npq.getStatus() == NonPatientQueue.NonPatientQueueStatus.ARRIVED
-			        || npq.getStatus() == NonPatientQueue.NonPatientQueueStatus.SERVING) {
-				nowServing.add(new QueueEntry(npq));
-			}
-		}
-		
-		// Sort by date created (oldest first for FIFO)
-		Collections.sort(allEntries, new Comparator<QueueEntry>() {
-			
-			@Override
-			public int compare(QueueEntry e1, QueueEntry e2) {
-				return e1.getDateCreated().compareTo(e2.getDateCreated());
-			}
-		});
-		Collections.sort(nowServing, new Comparator<QueueEntry>() {
-			
-			@Override
-			public int compare(QueueEntry e1, QueueEntry e2) {
-				if (e1.getCalledAt() != null && e2.getCalledAt() != null) {
-					return e1.getCalledAt().compareTo(e2.getCalledAt());
-				}
-				return e1.getDateCreated().compareTo(e2.getDateCreated());
-			}
-		});
-		
-		// Build response
-		Map<String, Object> response = new HashMap<String, Object>();
-		response.put("location", location);
-		response.put("queueRoom", queueRoom);
-		response.put("nowServing", nowServing.isEmpty() ? null : nowServing.get(0));
-		response.put("upNext", allEntries.isEmpty() ? null : allEntries.subList(0, Math.min(5, allEntries.size())));
-		response.put("statistics", buildStatistics(service, location, queueRoom, fromDate, toDate));
-		response.put("lastUpdated", new Date());
-		
-		return response;
+	private PatientQueueingService service() {
+		return Context.getService(PatientQueueingService.class);
+	}
+	
+	@Override
+	public QueueDisplayDto newDelegate() {
+		return new QueueDisplayDto();
 	}
 	
 	/**
-	 * Get queue statistics for a location
-	 * 
-	 * @param context the request context
-	 * @return statistics map
+	 * This resource is computed/read-only - no persistence.
 	 */
-	public Map<String, Object> getStatistics(RequestContext context) {
-		PatientQueueingService service = Context.getService(PatientQueueingService.class);
-		
-		String locationUuid = context.getParameter("location");
-		String queueRoomUuid = context.getParameter("queueRoom");
-		String dateFromParam = context.getParameter("dateFrom");
-		String dateToParam = context.getParameter("dateTo");
-		
-		// Parse date parameters
-		Date fromDate;
-		Date toDate;
-		
-		if (dateFromParam != null && !dateFromParam.isEmpty()) {
-			try {
-				fromDate = new Date(Long.parseLong(dateFromParam));
-			}
-			catch (NumberFormatException e) {
-				fromDate = OpenmrsUtil.firstSecondOfDay(new Date());
-			}
-		} else {
-			fromDate = OpenmrsUtil.firstSecondOfDay(new Date());
-		}
-		
-		if (dateToParam != null && !dateToParam.isEmpty()) {
-			try {
-				toDate = new Date(Long.parseLong(dateToParam));
-			}
-			catch (NumberFormatException e) {
-				toDate = OpenmrsUtil.getLastMomentOfDay(new Date());
-			}
-		} else {
-			toDate = OpenmrsUtil.getLastMomentOfDay(new Date());
-		}
-		
-		Location location = null;
-		Location queueRoom = null;
-		
-		if (locationUuid != null && !locationUuid.isEmpty()) {
-			location = Context.getLocationService().getLocationByUuid(locationUuid);
-			if (location == null) {
-				throw new IllegalArgumentException("Location not found: " + locationUuid);
-			}
-		}
-		
-		if (queueRoomUuid != null && !queueRoomUuid.isEmpty()) {
-			queueRoom = Context.getLocationService().getLocationByUuid(queueRoomUuid);
-			if (queueRoom == null) {
-				throw new IllegalArgumentException("Queue room not found: " + queueRoomUuid);
-			}
-		}
-		
-		return buildStatistics(service, location, queueRoom, fromDate, toDate);
+	@Override
+	public QueueDisplayDto save(QueueDisplayDto delegate) {
+		throw new ResourceDoesNotSupportOperationException("QueueDisplayResource is read-only");
 	}
 	
 	/**
-	 * Build statistics map for a location
+	 * Not supported: there is no persisted QueueDisplayDto by uuid. (We use doSearch with query
+	 * parameters.)
 	 */
-	private Map<String, Object> buildStatistics(PatientQueueingService service, Location location, Location queueRoom,
-	        Date fromDate, Date toDate) {
-		Map<String, Object> stats = new HashMap<String, Object>();
+	@Override
+	public QueueDisplayDto getByUniqueId(String uniqueId) {
+		throw new ResourceDoesNotSupportOperationException("QueueDisplayResource does not support getByUniqueId");
+	}
+	
+	@Override
+	protected void delete(QueueDisplayDto delegate, String reason, RequestContext context) throws ResponseException {
+		throw new ResourceDoesNotSupportOperationException("QueueDisplayResource is read-only");
+	}
+	
+	@Override
+	public void purge(QueueDisplayDto delegate, RequestContext context) throws ResponseException {
+		throw new ResourceDoesNotSupportOperationException("QueueDisplayResource is read-only");
+	}
+	
+	/**
+	 * OpenMRS REST routes GET with query params here. Example: /display?type=facility&uuid=...
+	 */
+	@Override
+	protected PageableResult doSearch(RequestContext context) throws ResponseException {
+		// We return a "single result" list so REST is happy with pageable results.
+		// Clients can read results[0], but to keep payload shape identical to your DTO,
+		// most clients call with v=custom and read the first entry.
+		//
+		// If you prefer returning the DTO object directly (not list), use BaseDelegatingResource instead.
+		QueueDisplayDto dto = buildFromParams(context);
+		List<QueueDisplayDto> one = Collections.singletonList(dto);
+		return new org.openmrs.module.webservices.rest.web.resource.impl.NeedsPaging<QueueDisplayDto>(one, context);
+	}
+	
+	/**
+	 * Optional: GET /display without params is not meaningful for a feed. We require uuid. We can
+	 * either throw or behave like doSearch.
+	 */
+	@Override
+	public PageableResult doGetAll(RequestContext context) throws ResponseException {
+		// If no uuid, reject (prevents confusing "all displays for all facilities" behavior).
+		String uuid = context.getParameter("uuid");
+		if (uuid == null || uuid.trim().isEmpty()) {
+			throw new ResourceDoesNotSupportOperationException("uuid is required (use /display?type=...&uuid=...)");
+		}
+		QueueDisplayDto dto = buildFromParams(context);
+		List<QueueDisplayDto> one = Collections.singletonList(dto);
+		return new org.openmrs.module.webservices.rest.web.resource.impl.NeedsPaging<QueueDisplayDto>(one, context);
+	}
+	
+	@Override
+	public DelegatingResourceDescription getRepresentationDescription(Representation rep) {
+		if (rep instanceof DefaultRepresentation || rep instanceof FullRepresentation) {
+			DelegatingResourceDescription d = new DelegatingResourceDescription();
+			d.addProperty("context");
+			d.addProperty("nowServing");
+			d.addProperty("upNext");
+			d.addProperty("stats");
+			d.addProperty("lastUpdated");
+			return d;
+		}
+		return null;
+	}
+	
+	@Override
+	public DelegatingResourceDescription getCreatableProperties() {
+		throw new ResourceDoesNotSupportOperationException("QueueDisplayResource is read-only");
+	}
+	
+	@Override
+	public DelegatingResourceDescription getUpdatableProperties() {
+		throw new ResourceDoesNotSupportOperationException("QueueDisplayResource is read-only");
+	}
+	
+	// ----------------- Core builder -----------------
+	
+	private QueueDisplayDto buildFromParams(RequestContext context) throws ResponseException {
+		String type = param(context, "type", "facility"); // facility|location|room
+		String uuid = context.getParameter("uuid");
+		String dateParam = param(context, "date", "today");
 		
-		// Patient queue statistics
-		int patientWaiting = 0;
-		int patientServing = 0;
-		int patientCompleted = 0;
+		if (uuid == null || uuid.trim().isEmpty()) {
+			throw new UnsupportedOperationException("uuid is required");
+		}
 		
-		List<PatientQueue> patientQueues = service.getPatientQueueList(null, fromDate, toDate, null, null, null, null,
-		    queueRoom);
-		for (PatientQueue pq : patientQueues) {
-			if (location == null || (location.equals(pq.getLocationTo()) || location.equals(pq.getQueueRoom()))) {
-				if (pq.getStatus() == PatientQueue.Status.PENDING) {
-					patientWaiting++;
-				} else if (pq.getStatus() == PatientQueue.Status.PICKED) {
-					patientServing++;
-				} else if (pq.getStatus() == PatientQueue.Status.COMPLETED) {
-					patientCompleted++;
+		Location loc = Context.getLocationService().getLocationByUuid(uuid);
+		if (loc == null) {
+			throw new UnsupportedOperationException("Location not found for uuid=" + uuid);
+		}
+		
+		DateRange range = resolveDateRange(dateParam);
+		
+		List<PatientQueue> patientQueues;
+		List<NonPatientQueue> nonPatientQueues;
+		
+		if ("facility".equalsIgnoreCase(type)) {
+			// Use FIFO method to get all queues under this facility (parent location)
+			patientQueues = service().getPatientQueueByParentLocationFifo(loc, null, range.from, range.to, false);
+			nonPatientQueues = service().getNonPatientQueuesByParentLocationFifo(loc, null, null, range.from, range.to,
+			    false);
+			return buildDisplayPayload("FACILITY", loc, patientQueues, nonPatientQueues);
+		} else if ("location".equalsIgnoreCase(type)) {
+			// Use FIFO method for location-level queues
+			patientQueues = service().getPatientQueueListFifo(null, range.from, range.to, loc, null, null, null, null);
+			nonPatientQueues = service().getNonPatientQueues(null, null, loc, null, range.from, range.to);
+			return buildDisplayPayload("LOCATION", loc, patientQueues, nonPatientQueues);
+		} else if ("room".equalsIgnoreCase(type)) {
+			// Use FIFO method for room-level queues
+			patientQueues = service().getPatientQueueListFifo(null, range.from, range.to, null, null, null, null, loc);
+			nonPatientQueues = service().getNonPatientQueues(null, null, null, loc, range.from, range.to);
+			return buildDisplayPayload("ROOM", loc, patientQueues, nonPatientQueues);
+		} else {
+			throw new UnsupportedOperationException("type must be facility|location|room");
+		}
+	}
+	
+	private QueueDisplayDto buildDisplayPayload(String type, Location contextLocation, List<PatientQueue> patientQueues,
+	        List<NonPatientQueue> nonPatientQueues) {
+		List<QueueDisplayRowDto> nowServing = new ArrayList<QueueDisplayRowDto>();
+		List<QueueDisplayRowDto> upNext = new ArrayList<QueueDisplayRowDto>();
+		
+		// Process patient queues
+		if (patientQueues != null) {
+			for (PatientQueue pq : patientQueues) {
+				PatientQueue.Status st = pq.getStatus();
+				
+				boolean isNow = st == PatientQueue.Status.PICKED;
+				boolean isNext = st == PatientQueue.Status.PENDING;
+				
+				if (isNow) {
+					nowServing.add(toRow(pq));
+				} else if (isNext) {
+					upNext.add(toRow(pq));
 				}
 			}
 		}
 		
-		// Non-patient queue statistics
-		int nonPatientWaiting = 0;
-		int nonPatientServing = 0;
-		int nonPatientCompleted = 0;
-		
-		List<NonPatientQueue> nonPatientQueues = service.getNonPatientQueues(null, null, location, queueRoom, fromDate,
-		    toDate);
-		for (NonPatientQueue npq : nonPatientQueues) {
-			if (npq.getStatus() == NonPatientQueue.NonPatientQueueStatus.WAITING) {
-				nonPatientWaiting++;
-			} else if (npq.getStatus() == NonPatientQueue.NonPatientQueueStatus.CALLED
-			        || npq.getStatus() == NonPatientQueue.NonPatientQueueStatus.ARRIVED
-			        || npq.getStatus() == NonPatientQueue.NonPatientQueueStatus.SERVING) {
-				nonPatientServing++;
-			} else if (npq.getStatus() == NonPatientQueue.NonPatientQueueStatus.COMPLETED) {
-				nonPatientCompleted++;
+		// Process non-patient queues
+		if (nonPatientQueues != null) {
+			for (NonPatientQueue pq : nonPatientQueues) {
+				NonPatientQueue.NonPatientQueueStatus st = pq.getStatus();
+				
+				boolean isNow = st == NonPatientQueue.NonPatientQueueStatus.CALLED
+				        || st == NonPatientQueue.NonPatientQueueStatus.SERVING
+				        || st == NonPatientQueue.NonPatientQueueStatus.ARRIVED;
+				boolean isNext = st == NonPatientQueue.NonPatientQueueStatus.WAITING;
+				
+				if (isNow) {
+					nowServing.add(toRowFromNonPatient(pq));
+				} else if (isNext) {
+					upNext.add(toRowFromNonPatient(pq));
+				}
 			}
 		}
 		
-		stats.put("patientWaiting", patientWaiting);
-		stats.put("patientServing", patientServing);
-		stats.put("patientCompleted", patientCompleted);
-		stats.put("nonPatientWaiting", nonPatientWaiting);
-		stats.put("nonPatientServing", nonPatientServing);
-		stats.put("nonPatientCompleted", nonPatientCompleted);
-		stats.put("totalWaiting", patientWaiting + nonPatientWaiting);
-		stats.put("totalServing", patientServing + nonPatientServing);
-		stats.put("totalCompleted", patientCompleted + nonPatientCompleted);
+		// Sort by priority (high to low), then by date created (FIFO)
+		Collections.sort(upNext, new Comparator<QueueDisplayRowDto>() {
+			
+			@Override
+			public int compare(QueueDisplayRowDto a, QueueDisplayRowDto b) {
+				// Sort by priority first (higher priority first)
+				Integer pa = a.getPriority() != null ? a.getPriority() : 0;
+				Integer pb = b.getPriority() != null ? b.getPriority() : 0;
+				int pcmp = Integer.compare(pb, pa);
+				if (pcmp != 0) {
+					return pcmp;
+				}
+				
+				// Then by date created (older first for FIFO)
+				Date da = a.getDateCreated();
+				Date db = b.getDateCreated();
+				if (da == null && db == null) {
+					return 0;
+				}
+				if (da == null) {
+					return 1;
+				}
+				if (db == null) {
+					return -1;
+				}
+				return da.compareTo(db);
+			}
+		});
 		
-		return stats;
+		QueueDisplayDto dto = new QueueDisplayDto();
+		dto.setContext(new QueueDisplayContextDto(type, contextLocation != null ? contextLocation.getUuid() : null,
+		        contextLocation != null ? contextLocation.getName() : null));
+		dto.setNowServing(nowServing);
+		dto.setUpNext(upNext);
+		dto.setStats(new QueueDisplayStatsDto(nowServing.size(), upNext.size(), (nowServing.size() + upNext.size())));
+		dto.setLastUpdated(new Date());
+		return dto;
+	}
+	
+	private QueueDisplayRowDto toRow(PatientQueue pq) {
+		QueueDisplayRowDto row = new QueueDisplayRowDto();
+		row.setUuid(pq.getUuid());
+		
+		String ticket = pq.getVisitNumber();
+		row.setTicketNumber(ticket);
+		
+		row.setStatus(pq.getStatus() != null ? pq.getStatus().name() : null);
+		row.setDisplayName(pq.getPatient() != null ? pq.getPatient().getPersonName().getFullName() : null);
+		row.setQueueLocation(pq.getLocationTo() != null ? pq.getLocationTo().getName() : null);
+		row.setServiceLocation(pq.getQueueRoom() != null ? pq.getQueueRoom().getName() : null);
+		row.setDateCreated(pq.getDateCreated());
+		row.setPriority(pq.getPriority());
+		row.setPriorityScore(null); // Not available in PatientQueue model
+		row.setPriorityReason(null); // Not available in PatientQueue model
+		return row;
+	}
+	
+	private QueueDisplayRowDto toRowFromNonPatient(NonPatientQueue pq) {
+		QueueDisplayRowDto row = new QueueDisplayRowDto();
+		row.setUuid(pq.getUuid());
+		
+		String ticket = pq.getTicketNumber();
+		row.setTicketNumber(ticket);
+		
+		row.setStatus(pq.getStatus() != null ? pq.getStatus().name() : null);
+		row.setDisplayName(pq.getDisplayName());
+		row.setQueueLocation(pq.getLocationTo() != null ? pq.getLocationTo().getName() : null);
+		row.setServiceLocation(pq.getQueueRoom() != null ? pq.getQueueRoom().getName() : null);
+		row.setDateCreated(pq.getDateCreated());
+		row.setPriority(pq.getPriority());
+		row.setPriorityScore(pq.getPriority());
+		row.setPriorityReason(pq.getComment());
+		return row;
+	}
+	
+	private String param(RequestContext context, String name, String def) {
+		String v = context.getParameter(name);
+		return (v == null || v.trim().isEmpty()) ? def : v.trim();
+	}
+	
+	private static class DateRange {
+		
+		private final Date from;
+		
+		private final Date to;
+		
+		private DateRange(Date from, Date to) {
+			this.from = from;
+			this.to = to;
+		}
+	}
+	
+	private DateRange resolveDateRange(String dateParam) {
+		Date target = new Date();
+		return new DateRange(OpenmrsUtil.firstSecondOfDay(target), OpenmrsUtil.getLastMomentOfDay(target));
 	}
 }

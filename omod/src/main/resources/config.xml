@@ -48,6 +48,24 @@
 		<defaultValue>b1a8b05e-3542-4037-bbd3-998ee9c40574,2131aff8-2e2a-480a-b7ab-4ac53250262b,58c57d25-8d39-41ab-8422-108a0c277d98</defaultValue>
 		<description>A comma separated list of location uuids for locations that clinicians operate from</description>
 	</globalProperty>
+
+	<globalProperty>
+		<property>patientqueueing.selfCheckInPersonAttributeTypeUuids</property>
+		<defaultValue>14d4f066-15f5-102d-96e4-000c29c2a5d7</defaultValue>
+		<description>Person attribute type UUID for phone number lookup during self check-in (default: Telephone Number)</description>
+	</globalProperty>
+
+	<globalProperty>
+		<property>patientqueueing.selfCheckInIdentifierTypeUuids</property>
+		<defaultValue>e1731641-30ab-102d-86b0-7a5022ba4115,f0c16a6d-dc5f-4118-a803-616d0075d282</defaultValue>
+		<description>Comma-separated list of patient identifier type UUIDs to search during self check-in (default: Patient ID, National ID)</description>
+	</globalProperty>
+
+	<globalProperty>
+		<property>patientqueueing.selfCheckInVisitTypeUuid</property>
+		<defaultValue></defaultValue>
+		<description>Visit type UUID to use when creating visits for patient self check-in (e.g., OPD visit type UUID). Leave empty to skip visit creation.</description>
+	</globalProperty>
 	
 	
 	<!-- Internationalization -->

@@ -387,7 +387,21 @@ public class PatientQueueingServiceImpl extends BaseOpenmrsService implements Pa
 	@Override
 	public List<NonPatientQueue> getNonPatientQueues(NonPatientQueue.NonPatientQueueStatus status, Concept queueType,
 	        Location locationTo, Location queueRoom, Date fromDate, Date toDate) {
-		return dao.getNonPatientQueues(status, queueType, locationTo, queueRoom, fromDate, toDate);
+		LocationTag queueRoomTag = Context.getLocationService().getLocationTagByUuid(ROOM_TAG_UUID);
+
+		// Flatten hierarchy for locationTo if provided
+		List<Location> locationToList = new ArrayList<>();
+		if (locationTo != null) {
+			flattenLocationHierarchy(locationTo, locationToList, queueRoomTag, false);
+		}
+
+		// Flatten hierarchy for queueRoom if provided
+		List<Location> queueRoomList = new ArrayList<>();
+		if (queueRoom != null) {
+			flattenLocationHierarchy(queueRoom, queueRoomList, queueRoomTag, true);
+		}
+
+		return dao.getNonPatientQueues(status, queueType, locationToList, queueRoomList, fromDate, toDate);
 	}
 	
 	@Override
@@ -512,5 +526,18 @@ public class PatientQueueingServiceImpl extends BaseOpenmrsService implements Pa
 		}
 		
 		return dateString + "-" + locationName + "-" + queueTypeCode + "-" + zeroesToAppend + nextNumberInQueue;
+	}
+	
+	@Override
+	public List<NonPatientQueue> getNonPatientQueuesByParentLocationFifo(Location parentLocation,
+	        NonPatientQueue.NonPatientQueueStatus status, Concept queueType, Date fromDate, Date toDate, boolean onlyInQueueRooms) {
+		LocationTag queueRoomTag = Context.getLocationService().getLocationTagByUuid(ROOM_TAG_UUID);
+		List<Location> childLocations = new ArrayList<>();
+		flattenLocationHierarchy(parentLocation, childLocations, queueRoomTag, onlyInQueueRooms);
+
+		if (childLocations.isEmpty()) {
+			return null;
+		}
+		return dao.getNonPatientQueuesInLocationsFifo(childLocations, status, queueType, fromDate, toDate);
 	}
 }

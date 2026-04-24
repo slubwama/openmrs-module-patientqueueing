@@ -436,4 +436,27 @@ public interface PatientQueueingService extends OpenmrsService {
 	 */
 	@Transactional(readOnly = true)
 	String generateNonPatientQueueTicketNumber(Location location, Concept queueType);
+	
+	/**
+	 * Gets non-patient queue entries for queue rooms under a parent location in first-in-first-out
+	 * order.
+	 * <p>
+	 * This method resolves child locations under the given parent location and retrieves queue
+	 * entries for those locations, sorted by creation date in ascending order. When
+	 * {@code onlyInQueueRooms} is {@code true}, only child locations tagged as queue rooms are
+	 * considered. If no matching child locations are found, this method returns {@code null}.
+	 * 
+	 * @param parentLocation the parent location whose child locations are to be searched
+	 * @param status the queue status to filter by; may be null
+	 * @param queueType the queue type concept to filter by; may be null
+	 * @param fromDate the start date for filtering by creation date; may be null
+	 * @param toDate the end date for filtering by creation date; may be null
+	 * @param onlyInQueueRooms whether to include only child locations tagged as queue rooms
+	 * @return a FIFO-ordered list of non-patient queue entries for matching child locations, or
+	 *         {@code null} if no matching child locations are found
+	 */
+	@Transactional(readOnly = true)
+	List<NonPatientQueue> getNonPatientQueuesByParentLocationFifo(Location parentLocation,
+	        NonPatientQueue.NonPatientQueueStatus status, Concept queueType, Date fromDate, Date toDate,
+	        boolean onlyInQueueRooms);
 }
