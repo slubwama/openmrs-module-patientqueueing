@@ -1,4 +1,4 @@
-package org.openmrs.module.patientqueueing.customdto;
+package org.openmrs.module.patientqueueing.web.customdto;
 
 import org.openmrs.Location;
 import org.openmrs.Patient;
@@ -8,12 +8,16 @@ import java.io.Serializable;
 import java.util.Date;
 
 /**
- * Unified DTO for queue entries that can represent either a PatientQueue or NonPatientQueue This is
- * used for kiosk displays and public queue displays where both types need to be shown together
+ * Unified DTO for queue entries that can represent either a PatientQueue or NonPatientQueue. This
+ * class serves multiple purposes: 1. Kiosk displays and public queue displays where both types need
+ * to be shown together 2. Provider dashboard REST API responses 3. Check-in result responses
+ * Supports both full OpenMRS objects (for internal use) and simple UUID references (for REST API).
  */
 public class QueueEntry implements Serializable {
 	
 	private static final long serialVersionUID = 1L;
+	
+	// ===== Common fields (both internal and REST API) =====
 	
 	/**
 	 * The UUID of the queue entry Maps to: PatientQueue.uuid or NonPatientQueue.uuid
@@ -25,6 +29,12 @@ public class QueueEntry implements Serializable {
 	 * NonPatientQueue.ticketNumber
 	 */
 	private String ticketNumber;
+	
+	/**
+	 * Alias for ticketNumber - used for provider dashboard Maps to: PatientQueue.visitNumber or
+	 * NonPatientQueue.ticketNumber
+	 */
+	private String queueNumber;
 	
 	/**
 	 * The status of this queue entry Maps to: PatientQueue.Status or
@@ -44,23 +54,6 @@ public class QueueEntry implements Serializable {
 	private String queueType;
 	
 	/**
-	 * The destination location Maps to: PatientQueue.locationTo or NonPatientQueue.locationTo
-	 */
-	private Location locationTo;
-	
-	/**
-	 * The queue room where this entry is queued Maps to: PatientQueue.queueRoom or
-	 * NonPatientQueue.queueRoom
-	 */
-	private Location queueRoom;
-	
-	/**
-	 * The date when this entry was created Maps to: PatientQueue.dateCreated or
-	 * NonPatientQueue.dateCreated
-	 */
-	private Date dateCreated;
-	
-	/**
 	 * The priority of this queue entry Maps to: PatientQueue.priority or NonPatientQueue.priority
 	 */
 	private Integer priority;
@@ -69,6 +62,26 @@ public class QueueEntry implements Serializable {
 	 * Any additional comments Maps to: PatientQueue.comment or NonPatientQueue.comment
 	 */
 	private String comment;
+	
+	/**
+	 * The date when this entry was created Maps to: PatientQueue.dateCreated or
+	 * NonPatientQueue.dateCreated
+	 */
+	private Date dateCreated;
+	
+	// ===== Internal use fields (OpenMRS objects) =====
+	
+	/**
+	 * The destination location (OpenMRS object) Maps to: PatientQueue.locationTo or
+	 * NonPatientQueue.locationTo
+	 */
+	private Location locationTo;
+	
+	/**
+	 * The queue room where this entry is queued (OpenMRS object) Maps to: PatientQueue.queueRoom or
+	 * NonPatientQueue.queueRoom
+	 */
+	private Location queueRoom;
 	
 	/**
 	 * The patient (only for PATIENT type) Maps to: PatientQueue.patient
@@ -103,7 +116,49 @@ public class QueueEntry implements Serializable {
 	 */
 	private Boolean isPatientQueue;
 	
-	// Empty constructor for JSON/serialization
+	// ===== REST API fields (String UUIDs and additional properties) =====
+	
+	/**
+	 * Helper for updates/debugging Values: PATIENT_QUEUE or NON_PATIENT_QUEUE
+	 */
+	private String sourceType;
+	
+	/**
+	 * UUID of the destination location (for REST API updates) Used when frontend sends the
+	 * destination
+	 */
+	private String locationToUuid;
+	
+	/**
+	 * UUID of the queue room (for REST API updates) Used when frontend sends the destination
+	 */
+	private String queueRoomUuid;
+	
+	/**
+	 * Human-readable current location name
+	 */
+	private String currentLocation;
+	
+	/**
+	 * Human-readable service location name
+	 */
+	private String serviceLocation;
+	
+	/**
+	 * Identifier for how the patient is identified (e.g., "Patient Record", "Other")
+	 */
+	private String identifiedBy;
+	
+	/**
+	 * Action to perform (e.g., "FORWARD", "CALL", "COMPLETE") Used for REST API updates
+	 */
+	private String action;
+	
+	// ===== Constructors =====
+	
+	/**
+	 * Empty constructor for JSON/serialization
+	 */
 	public QueueEntry() {
 	}
 	
@@ -113,6 +168,7 @@ public class QueueEntry implements Serializable {
 	public QueueEntry(org.openmrs.module.patientqueueing.model.PatientQueue patientQueue) {
 		this.uuid = patientQueue.getUuid();
 		this.ticketNumber = patientQueue.getVisitNumber();
+		this.queueNumber = patientQueue.getVisitNumber();
 		this.status = patientQueue.getStatus() != null ? patientQueue.getStatus().name() : null;
 		this.displayName = formatPatientName(patientQueue.getPatient());
 		this.queueType = "PATIENT";
@@ -126,6 +182,18 @@ public class QueueEntry implements Serializable {
 		this.calledAt = patientQueue.getDatePicked();
 		this.completedAt = patientQueue.getDateCompleted();
 		this.isPatientQueue = true;
+		this.sourceType = "PATIENT_QUEUE";
+		
+		// Set UUID fields for REST API
+		if (this.locationTo != null) {
+			this.locationToUuid = this.locationTo.getUuid();
+			this.currentLocation = this.locationTo.getName();
+		}
+		if (this.queueRoom != null) {
+			this.queueRoomUuid = this.queueRoom.getUuid();
+			this.serviceLocation = this.queueRoom.getName();
+		}
+		this.identifiedBy = "Patient Record";
 	}
 	
 	/**
@@ -134,6 +202,7 @@ public class QueueEntry implements Serializable {
 	public QueueEntry(org.openmrs.module.patientqueueing.model.NonPatientQueue nonPatientQueue) {
 		this.uuid = nonPatientQueue.getUuid();
 		this.ticketNumber = nonPatientQueue.getTicketNumber();
+		this.queueNumber = nonPatientQueue.getTicketNumber();
 		this.status = nonPatientQueue.getStatus() != null ? nonPatientQueue.getStatus().name() : null;
 		this.displayName = nonPatientQueue.getDisplayName();
 		this.queueType = "NON_PATIENT";
@@ -148,6 +217,18 @@ public class QueueEntry implements Serializable {
 		this.startedAt = nonPatientQueue.getStartedAt();
 		this.completedAt = nonPatientQueue.getEndedAt();
 		this.isPatientQueue = false;
+		this.sourceType = "NON_PATIENT_QUEUE";
+		
+		// Set UUID fields for REST API
+		if (this.locationTo != null) {
+			this.locationToUuid = this.locationTo.getUuid();
+			this.currentLocation = this.locationTo.getName();
+		}
+		if (this.queueRoom != null) {
+			this.queueRoomUuid = this.queueRoom.getUuid();
+			this.serviceLocation = this.queueRoom.getName();
+		}
+		this.identifiedBy = "Other";
 	}
 	
 	/**
@@ -160,7 +241,8 @@ public class QueueEntry implements Serializable {
 		return patient.getPersonName().getGivenName() + " " + patient.getPersonName().getFamilyName();
 	}
 	
-	// Getters and Setters
+	// ===== Getters and Setters =====
+	
 	public String getUuid() {
 		return uuid;
 	}
@@ -175,6 +257,22 @@ public class QueueEntry implements Serializable {
 	
 	public void setTicketNumber(String ticketNumber) {
 		this.ticketNumber = ticketNumber;
+		// Keep both fields in sync for backward compatibility
+		if (this.queueNumber == null) {
+			this.queueNumber = ticketNumber;
+		}
+	}
+	
+	public String getQueueNumber() {
+		return queueNumber;
+	}
+	
+	public void setQueueNumber(String queueNumber) {
+		this.queueNumber = queueNumber;
+		// Keep both fields in sync for backward compatibility
+		if (this.ticketNumber == null) {
+			this.ticketNumber = queueNumber;
+		}
 	}
 	
 	public String getStatus() {
@@ -207,6 +305,10 @@ public class QueueEntry implements Serializable {
 	
 	public void setLocationTo(Location locationTo) {
 		this.locationTo = locationTo;
+		if (locationTo != null) {
+			this.locationToUuid = locationTo.getUuid();
+			this.currentLocation = locationTo.getName();
+		}
 	}
 	
 	public Location getQueueRoom() {
@@ -215,6 +317,10 @@ public class QueueEntry implements Serializable {
 	
 	public void setQueueRoom(Location queueRoom) {
 		this.queueRoom = queueRoom;
+		if (queueRoom != null) {
+			this.queueRoomUuid = queueRoom.getUuid();
+			this.serviceLocation = queueRoom.getName();
+		}
 	}
 	
 	public Date getDateCreated() {
@@ -288,6 +394,64 @@ public class QueueEntry implements Serializable {
 	public void setIsPatientQueue(Boolean isPatientQueue) {
 		this.isPatientQueue = isPatientQueue;
 	}
+	
+	public String getSourceType() {
+		return sourceType;
+	}
+	
+	public void setSourceType(String sourceType) {
+		this.sourceType = sourceType;
+	}
+	
+	public String getLocationToUuid() {
+		return locationToUuid;
+	}
+	
+	public void setLocationToUuid(String locationToUuid) {
+		this.locationToUuid = locationToUuid;
+	}
+	
+	public String getQueueRoomUuid() {
+		return queueRoomUuid;
+	}
+	
+	public void setQueueRoomUuid(String queueRoomUuid) {
+		this.queueRoomUuid = queueRoomUuid;
+	}
+	
+	public String getCurrentLocation() {
+		return currentLocation;
+	}
+	
+	public void setCurrentLocation(String currentLocation) {
+		this.currentLocation = currentLocation;
+	}
+	
+	public String getServiceLocation() {
+		return serviceLocation;
+	}
+	
+	public void setServiceLocation(String serviceLocation) {
+		this.serviceLocation = serviceLocation;
+	}
+	
+	public String getIdentifiedBy() {
+		return identifiedBy;
+	}
+	
+	public void setIdentifiedBy(String identifiedBy) {
+		this.identifiedBy = identifiedBy;
+	}
+	
+	public String getAction() {
+		return action;
+	}
+	
+	public void setAction(String action) {
+		this.action = action;
+	}
+	
+	// ===== Helper methods =====
 	
 	/**
 	 * Check if this is a patient queue entry

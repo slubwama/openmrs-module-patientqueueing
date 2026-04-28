@@ -3,7 +3,7 @@ package org.openmrs.module.patientqueueing.web.resource;
 import org.openmrs.Location;
 import org.openmrs.api.context.Context;
 import org.openmrs.module.patientqueueing.api.PatientQueueingService;
-import org.openmrs.module.patientqueueing.customdto.QueueEntry;
+import org.openmrs.module.patientqueueing.web.customdto.QueueEntry;
 import org.openmrs.module.patientqueueing.model.NonPatientQueue;
 import org.openmrs.module.patientqueueing.model.PatientQueue;
 import org.openmrs.module.webservices.rest.web.RequestContext;

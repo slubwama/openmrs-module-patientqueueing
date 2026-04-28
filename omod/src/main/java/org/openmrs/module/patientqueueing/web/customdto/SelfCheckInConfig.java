@@ -1,4 +1,4 @@
-package org.openmrs.module.patientqueueing.customdto;
+package org.openmrs.module.patientqueueing.web.customdto;
 
 import java.io.Serializable;
 import java.util.List;

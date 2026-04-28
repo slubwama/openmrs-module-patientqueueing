@@ -1,4 +1,4 @@
-package org.openmrs.module.patientqueueing.customdto;
+package org.openmrs.module.patientqueueing.web.customdto;
 
 import org.openmrs.Visit;
 import org.openmrs.module.patientqueueing.model.PatientQueue;
