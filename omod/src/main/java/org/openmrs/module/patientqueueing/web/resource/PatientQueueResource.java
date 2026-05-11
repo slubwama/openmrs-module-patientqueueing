@@ -226,6 +226,7 @@ public class PatientQueueResource extends DelegatingCrudResource<PatientQueue> {
 		boolean onlyInQueueRooms = Boolean.parseBoolean(context.getParameter("onlyInQueueRooms"));
 		String status = context.getParameter("status");
 		String queueRoomQuery = context.getParameter("room");
+		boolean includeHistory = Boolean.parseBoolean(context.getParameter("includeHistory"));
 		PatientQueue.Status queueStatus = null;
 		
 		Location location = null;
@@ -257,6 +258,17 @@ public class PatientQueueResource extends DelegatingCrudResource<PatientQueue> {
 			PatientQueuesByQuery = patientQueueingService.getPatientQueueListBySearchParams(
 			    context.getParameter("searchString"), OpenmrsUtil.firstSecondOfDay(new Date()),
 			    OpenmrsUtil.getLastMomentOfDay(new Date()), location, null, queueStatus, room);
+		}
+		
+		// Filter out COMPLETED entries unless includeHistory is true
+		if (!includeHistory && PatientQueuesByQuery != null) {
+			List<PatientQueue> filtered = new java.util.ArrayList<PatientQueue>();
+			for (PatientQueue queue : PatientQueuesByQuery) {
+				if (queue.getStatus() != PatientQueue.Status.COMPLETED) {
+					filtered.add(queue);
+				}
+			}
+			PatientQueuesByQuery = filtered;
 		}
 		
 		return new NeedsPaging<PatientQueue>(PatientQueuesByQuery, context);

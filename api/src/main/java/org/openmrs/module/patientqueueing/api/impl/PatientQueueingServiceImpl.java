@@ -131,20 +131,20 @@ public class PatientQueueingServiceImpl extends BaseOpenmrsService implements Pa
 		
 		SimpleDateFormat formatterExt = new SimpleDateFormat("dd/MM/yyyy");
 		
-		List<PatientQueue> patientQueues = getPatientQueueList(null, OpenmrsUtil.firstSecondOfDay(today),
-		    OpenmrsUtil.getLastMomentOfDay(today), null, location, null, null);
+		// Get ALL patient queues for today across ALL locations to ensure facility-wide unique numbers
+		List<PatientQueue> allPatientQueuesToday = getPatientQueueList(null, OpenmrsUtil.firstSecondOfDay(today),
+		    OpenmrsUtil.getLastMomentOfDay(today), null, null, null, null);
 		
-		int nextNumberInQueue = 1;
-		if (!patientQueues.isEmpty()) {
-			
-			int visitNumberLength = patientQueues.get(0).getVisitNumber().length();
-			
-			if (visitNumberLength == VISIT_NUMBER_INTEGER_START_POSITION + INTEGER_IN_VISIT_NUMBER_LENGTH) {
-				nextNumberInQueue = Integer.parseInt(patientQueues.get(0).getVisitNumber()
-				        .subSequence(VISIT_NUMBER_INTEGER_START_POSITION, visitNumberLength).toString());
-				nextNumberInQueue += 1;
+		// Count unique patients who have checked in today across the entire facility
+		Set<Integer> uniquePatientIds = new HashSet<Integer>();
+		for (PatientQueue pq : allPatientQueuesToday) {
+			if (pq.getPatient() != null) {
+				uniquePatientIds.add(pq.getPatient().getPatientId());
 			}
 		}
+		
+		// Next number is count of unique patients + 1
+		int nextNumberInQueue = uniquePatientIds.size() + 1;
 		
 		String dateString = formatterExt.format(today);
 		
@@ -488,25 +488,12 @@ public class PatientQueueingServiceImpl extends BaseOpenmrsService implements Pa
 		Date today = new Date();
 		SimpleDateFormat formatterExt = new SimpleDateFormat("dd/MM/yyyy");
 		
-		List<NonPatientQueue> existingQueues = getNonPatientQueues(null, queueType, null, null,
+		// Get ALL non-patient queues for today across ALL queue types to ensure facility-wide unique numbers
+		List<NonPatientQueue> allNonPatientQueuesToday = getNonPatientQueues(null, null, null, null,
 		    OpenmrsUtil.firstSecondOfDay(today), OpenmrsUtil.getLastMomentOfDay(today));
 		
-		int nextNumberInQueue = 1;
-		if (!existingQueues.isEmpty()) {
-			// Get the most recently created queue (last in the list since it's sorted by dateCreated ASC)
-			NonPatientQueue lastQueue = existingQueues.get(existingQueues.size() - 1);
-			String lastTicketNumber = lastQueue.getTicketNumber();
-			if (lastTicketNumber != null && lastTicketNumber.length() >= 15 + 3) {
-				try {
-					nextNumberInQueue = Integer.parseInt(lastTicketNumber.substring(15));
-					nextNumberInQueue += 1;
-				}
-				catch (NumberFormatException e) {
-					// If parsing fails, start from 1
-					nextNumberInQueue = 1;
-				}
-			}
-		}
+		// Next number is count of all non-patient entries + 1
+		int nextNumberInQueue = allNonPatientQueuesToday.size() + 1;
 		
 		String dateString = formatterExt.format(today);
 		

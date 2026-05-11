@@ -100,6 +100,7 @@ public class NonPatientQueueResource extends DelegatingCrudResource<NonPatientQu
 		String queueRoomParam = context.getParameter("queueRoom");
 		String fromDateParam = context.getParameter("fromDate");
 		String toDateParam = context.getParameter("toDate");
+		boolean includeHistory = Boolean.parseBoolean(context.getParameter("includeHistory"));
 		
 		NonPatientQueue.NonPatientQueueStatus status = null;
 		if (statusParam != null && !statusParam.isEmpty()) {
@@ -146,6 +147,17 @@ public class NonPatientQueueResource extends DelegatingCrudResource<NonPatientQu
 		
 		List<NonPatientQueue> queues = service.getNonPatientQueues(status, queueType, locationTo, queueRoom, fromDate,
 		    toDate);
+		
+		// Filter out COMPLETED entries unless includeHistory is true
+		if (!includeHistory && queues != null) {
+			List<NonPatientQueue> filtered = new ArrayList<NonPatientQueue>();
+			for (NonPatientQueue queue : queues) {
+				if (queue.getStatus() != NonPatientQueue.NonPatientQueueStatus.COMPLETED) {
+					filtered.add(queue);
+				}
+			}
+			queues = filtered;
+		}
 		
 		return new NeedsPaging<NonPatientQueue>(queues, context);
 	}
@@ -269,6 +281,7 @@ public class NonPatientQueueResource extends DelegatingCrudResource<NonPatientQu
 		String statusParam = context.getParameter("status");
 		String fromDateParam = context.getParameter("fromDate");
 		String toDateParam = context.getParameter("toDate");
+		boolean includeHistory = Boolean.parseBoolean(context.getParameter("includeHistory"));
 		
 		Location queueRoom = null;
 		if (queueRoomParam != null && !queueRoomParam.isEmpty()) {
@@ -318,6 +331,17 @@ public class NonPatientQueueResource extends DelegatingCrudResource<NonPatientQu
 		} else {
 			// Get all active queues
 			results = service.getAllActiveNonPatientQueues();
+		}
+		
+		// Filter out COMPLETED entries unless includeHistory is true
+		if (!includeHistory && results != null) {
+			List<NonPatientQueue> filtered = new ArrayList<NonPatientQueue>();
+			for (NonPatientQueue queue : results) {
+				if (queue.getStatus() != NonPatientQueue.NonPatientQueueStatus.COMPLETED) {
+					filtered.add(queue);
+				}
+			}
+			results = filtered;
 		}
 		
 		return new NeedsPaging<NonPatientQueue>(results, context);
