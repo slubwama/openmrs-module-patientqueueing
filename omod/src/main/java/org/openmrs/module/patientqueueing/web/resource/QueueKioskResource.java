@@ -18,6 +18,12 @@ import org.openmrs.module.webservices.rest.SimpleObject;
 import org.openmrs.module.webservices.rest.web.RequestContext;
 import org.openmrs.module.webservices.rest.web.RestConstants;
 import org.openmrs.module.webservices.rest.web.annotation.Resource;
+import org.openmrs.module.webservices.rest.web.resource.impl.DelegatingCrudResource;
+import org.openmrs.module.webservices.rest.web.resource.impl.DelegatingResourceDescription;
+import org.openmrs.module.webservices.rest.web.response.ResourceDoesNotSupportOperationException;
+import org.openmrs.module.webservices.rest.web.response.ResponseException;
+import org.openmrs.module.webservices.rest.web.resource.api.PageableResult;
+import org.openmrs.module.webservices.rest.web.resource.impl.NeedsPaging;
 import org.openmrs.util.OpenmrsUtil;
 
 import java.util.ArrayList;
@@ -33,292 +39,67 @@ import java.util.Map;
  * queues Supports ticket lookup by ticket number Handles both our clean API and
  * UgandaEMR-compatible requests for backward compatibility
  */
-@Resource(name = RestConstants.VERSION_1 + "/kiosk", supportedClass = Object.class, supportedOpenmrsVersions = { "1.9.* - 9.*" })
-public class QueueKioskResource {
+@Resource(name = RestConstants.VERSION_1 + "/kiosk", supportedClass = SimpleObject.class, supportedOpenmrsVersions = { "1.9.* - 9.*" })
+public class QueueKioskResource extends DelegatingCrudResource<SimpleObject> {
 	
-	/**
-	 * Lookup patient by identifier or phone number before check-in. Used by kiosk to verify patient
-	 * identity before creating queue entry. GET /kiosk/lookup?query=xxx&location=xxx
-	 * 
-	 * @param context the request context containing query and location parameters
-	 * @return SimpleObject with found status, patient uuid, display name, and identifiers
-	 */
+	private static final int PATIENT_SEARCH_LIMIT = 5000;
 	
-	public SimpleObject lookupPatient(RequestContext context) {
-		String query = context.getParameter("query");
-		String locationUuid = context.getParameter("location");
-		
-		SimpleObject result = new SimpleObject();
-		
-		if (query == null || query.trim().isEmpty()) {
-			result.put("found", false);
-			result.put("message", "Query parameter is required");
-			return result;
-		}
-		
-		query = query.trim();
-		
-		try {
-			// Try to find patient by configured identifier types first
-			Patient patient = findPatientByIdentifier(query);
-			
-			// If not found, try person attributes (phone number)
-			if (patient == null) {
-				patient = findPatientByPersonAttribute(query);
-			}
-			
-			if (patient != null) {
-				result.put("found", true);
-				result.put("uuid", patient.getUuid());
-				result.put("displayName", patient.getPersonName().getFullName());
-				result.put("identifiers", buildIdentifiersList(patient));
-			} else {
-				result.put("found", false);
-				result.put("message", "Patient not found");
-			}
-		}
-		catch (APIException e) {
-			result.put("found", false);
-			result.put("message", "Lookup failed: " + e.getMessage());
-		}
-		
-		return result;
+	@Override
+	public SimpleObject newDelegate() {
+		return new SimpleObject();
 	}
 	
-	/**
-	 * Find patient by configured identifier types
-	 */
-	private Patient findPatientByIdentifier(String identifierValue) {
-		AdministrationService administrationService = Context.getService(AdministrationService.class);
-		
-		// Get configured identifier type UUIDs from global property
-		String identifierTypeUuidsStr = administrationService.getGlobalProperty(
-		    PatientQueueingConstants.GP_SELF_CHECK_IN_IDENTIFIER_TYPE_UUIDS,
-		    PatientQueueingConstants.DEFAULT_PATIENT_ID_IDENTIFIER_TYPE_UUID + ","
-		            + PatientQueueingConstants.DEFAULT_NATIONAL_ID_IDENTIFIER_TYPE_UUID);
-		
-		String[] uuids = identifierTypeUuidsStr.split(",");
-		for (String uuid : uuids) {
-			uuid = uuid.trim();
-			if (uuid.isEmpty()) {
-				continue;
-			}
-			
-			try {
-				List<PatientIdentifier> identifiers = Context.getPatientService().getPatientIdentifiers(identifierValue,
-				    Collections.singletonList(Context.getPatientService().getPatientIdentifierTypeByUuid(uuid)), null, null,
-				    null);
-				
-				if (identifiers != null && !identifiers.isEmpty()) {
-					if (identifiers.size() > 1) {
-						// Multiple found - return first but log warning
-						// Let caller handle multiple match scenario
-					}
-					return identifiers.get(0).getPatient();
-				}
-			}
-			catch (Exception e) {
-				// Continue to next identifier type
-			}
-		}
-		
+	@Override
+	public SimpleObject save(SimpleObject simpleObject) {
+		return simpleObject;
+	}
+	
+	@Override
+	public DelegatingResourceDescription getRepresentationDescription(
+	        org.openmrs.module.webservices.rest.web.representation.Representation representation) {
 		return null;
 	}
 	
-	/**
-	 * Find patient by person attributes (phone number)
-	 */
-	private Patient findPatientByPersonAttribute(String attributeValue) {
-		AdministrationService administrationService = Context.getService(AdministrationService.class);
-		
-		// Get configured person attribute type UUIDs from global property
-		String personAttributeTypeUuidsStr = administrationService.getGlobalProperty(
-		    PatientQueueingConstants.GP_SELF_CHECK_IN_PERSON_ATTRIBUTE_TYPE_UUIDS,
-		    PatientQueueingConstants.DEFAULT_PHONE_ATTRIBUTE_TYPE_UUID);
-		
-		String[] uuids = personAttributeTypeUuidsStr.split(",");
-		
-		for (String uuid : uuids) {
-			uuid = uuid.trim();
-			if (uuid.isEmpty()) {
-				continue;
-			}
-			
-			try {
-				PersonAttributeType attributeType = Context.getPersonService().getPersonAttributeTypeByUuid(uuid);
-				if (attributeType == null) {
-					continue;
-				}
-				
-				// Search patients by person attribute
-				List<Patient> allPatients = Context.getPatientService().getAllPatients(false);
-				if (allPatients == null || allPatients.isEmpty()) {
-					continue;
-				}
-				
-				List<Patient> matchingPatients = new ArrayList<Patient>();
-				for (Patient p : allPatients) {
-					if (p.getPerson() != null && p.getPerson().getAttribute(attributeType) != null) {
-						String attrValue = p.getPerson().getAttribute(attributeType).getValue();
-						if (attributeValue.equals(attrValue)) {
-							matchingPatients.add(p);
-						}
-					}
-				}
-				
-				if (!matchingPatients.isEmpty()) {
-					if (matchingPatients.size() > 1) {
-						// Multiple found - return first but log warning
-					}
-					return matchingPatients.get(0);
-				}
-			}
-			catch (Exception e) {
-				// Continue to next attribute type
-			}
-		}
-		
-		return null;
+	@Override
+	public SimpleObject getByUniqueId(String uniqueId) {
+		throw new ResourceDoesNotSupportOperationException();
 	}
 	
-	/**
-	 * Build list of patient identifiers for display
-	 */
-	private List<Map<String, String>> buildIdentifiersList(Patient patient) {
-		List<Map<String, String>> identifiers = new ArrayList<Map<String, String>>();
-		
-		if (patient.getActiveIdentifiers() != null) {
-			for (PatientIdentifier identifier : patient.getActiveIdentifiers()) {
-				Map<String, String> idMap = new HashMap<String, String>();
-				idMap.put("type", identifier.getIdentifierType().getName());
-				idMap.put("value", identifier.getIdentifier());
-				identifiers.add(idMap);
-			}
-		}
-		
-		return identifiers;
+	@Override
+	public void delete(SimpleObject simpleObject, String reason, RequestContext context) throws ResponseException {
+		throw new ResourceDoesNotSupportOperationException();
 	}
 	
-	/**
-	 * Get available locations for kiosk check-in based on configured location tag. Returns only
-	 * locations that have the configured kiosk location tag. GET /kiosk/locations
-	 * 
-	 * @param context the request context
-	 * @return SimpleObject with list of locations
-	 */
-	
-	public SimpleObject getKioskLocations(RequestContext context) {
-		String tagUuid = Context.getService(AdministrationService.class).getGlobalProperty(
-		    PatientQueueingConstants.GP_KIOSK_LOCATION_TAG_UUID);
-		
-		SimpleObject result = new SimpleObject();
-		List<Map<String, Object>> locations = new ArrayList<Map<String, Object>>();
-		
-		if (tagUuid != null && !tagUuid.isEmpty()) {
-			LocationTag tag = Context.getLocationService().getLocationTagByUuid(tagUuid);
-			if (tag != null) {
-				List<Location> allLocations = Context.getLocationService().getAllLocations(false);
-				for (Location loc : allLocations) {
-					if (loc.getTags() != null && loc.getTags().contains(tag)) {
-						Map<String, Object> locMap = new HashMap<String, Object>();
-						locMap.put("uuid", loc.getUuid());
-						locMap.put("name", loc.getName());
-						locMap.put("description", loc.getDescription());
-						locations.add(locMap);
-					}
-				}
-			}
-		}
-		
-		result.put("locations", locations);
-		result.put("count", locations.size());
-		return result;
+	@Override
+	public void purge(SimpleObject simpleObject, RequestContext context) throws ResponseException {
+		throw new ResourceDoesNotSupportOperationException();
 	}
 	
-	/**
-	 * Get the least busy location from a list of locations with a given tag. Used for load
-	 * balancing when creating queue entries.
-	 * 
-	 * @param tagUuid the location tag UUID
-	 * @return the location with the fewest pending queue entries, or null if no locations found
-	 */
-	public Location getLeastBusyLocationByTag(String tagUuid) {
-		if (tagUuid == null || tagUuid.isEmpty()) {
-			return null;
-		}
-		
-		LocationTag tag = Context.getLocationService().getLocationTagByUuid(tagUuid);
-		if (tag == null) {
-			return null;
-		}
-		
-		PatientQueueingService service = Context.getService(PatientQueueingService.class);
-		Date today = new Date();
-		Date fromDate = OpenmrsUtil.firstSecondOfDay(today);
-		Date toDate = OpenmrsUtil.getLastMomentOfDay(today);
-		
-		// Get all locations with this tag
-		List<Location> taggedLocations = new ArrayList<Location>();
-		for (Location loc : Context.getLocationService().getAllLocations(false)) {
-			if (loc.getTags() != null && loc.getTags().contains(tag)) {
-				taggedLocations.add(loc);
-			}
-		}
-		
-		if (taggedLocations.isEmpty()) {
-			return null;
-		}
-		
-		// If only one location, return it
-		if (taggedLocations.size() == 1) {
-			return taggedLocations.get(0);
-		}
-		
-		// Find location with least pending queues
-		Location leastBusy = null;
-		int minCount = Integer.MAX_VALUE;
-		
-		for (Location loc : taggedLocations) {
-			List<PatientQueue> queues = service.getPatientQueueList(null, fromDate, toDate, loc, null, null, null);
-			int pendingCount = 0;
-			for (PatientQueue q : queues) {
-				if (q.getStatus() == PatientQueue.Status.PENDING) {
-					pendingCount++;
-				}
-			}
-			
-			if (pendingCount < minCount) {
-				minCount = pendingCount;
-				leastBusy = loc;
-			}
-		}
-		
-		return leastBusy;
-	}
-	
-	/**
-	 * Main GET method - handles both our clean API and UgandaEMR-compatible requests UgandaEMR
-	 * requests use "visitNumber" parameter and expect wrapped response Our API uses "ticketNumber"
-	 * and returns QueueEntry directly
-	 */
-	public Object get(RequestContext context) {
+	@Override
+	public PageableResult doGetAll(RequestContext context) throws ResponseException {
 		// Detect UgandaEMR request by parameter names
 		String visitNumber = context.getParameter("visitNumber");
 		String ticketNumber = context.getParameter("ticketNumber");
 		
 		if (visitNumber != null) {
 			// UgandaEMR format request - return wrapped response
-			return getKioskStatusUgandaEMRStyle(context);
+			return new NeedsPaging<SimpleObject>(Collections.singletonList(getKioskStatusUgandaEMRStyle(context)), context);
 		} else {
 			// Our clean API format - return QueueEntry directly
-			return getQueueByTicketNumber(context);
+			QueueEntry entry = getQueueByTicketNumber(context);
+			SimpleObject result = new SimpleObject();
+			result.put("ticketNumber", entry.getTicketNumber());
+			result.put("status", entry.getStatus());
+			result.put("displayName", entry.getDisplayName());
+			result.put("dateCreated", entry.getDateCreated());
+			return new NeedsPaging<SimpleObject>(Collections.singletonList(result), context);
 		}
 	}
 	
 	/**
 	 * UgandaEMR-compatible kiosk status lookup Returns wrapped response with results array
 	 */
-	private Object getKioskStatusUgandaEMRStyle(RequestContext context) {
+	private SimpleObject getKioskStatusUgandaEMRStyle(RequestContext context) {
 		PatientQueueingService service = Context.getService(PatientQueueingService.class);
 		
 		// Support both parameter names for compatibility
@@ -353,7 +134,7 @@ public class QueueKioskResource {
 		}
 		
 		// Wrap in results array like UgandaEMR
-		Map<String, Object> response = new HashMap<String, Object>();
+		SimpleObject response = new SimpleObject();
 		response.put("results", results);
 		
 		return response;

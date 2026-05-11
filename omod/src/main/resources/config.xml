@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <module configVersion="1.2">
-	
+
 	<!-- Base Module Properties -->
 	<id>${project.parent.artifactId}</id>
 	<name>${project.parent.name}</name>
@@ -10,13 +10,13 @@
 	<author>METS</author>
 	<description>
 			${project.parent.description}
-	</description>
+		</description>
 
 	<activator>org.openmrs.module.patientqueueing.PatientQueueingActivator</activator>
-	
+
 	<!-- <updateURL>https://modules.openmrs.org/modules/download/@MODULE_ID@/update.rdf</updateURL> -->
 	<!-- /Base Module Properties -->
-	
+
 	<require_version>${openmrsPlatformVersion}</require_version>
 
 	<require_modules>
@@ -79,7 +79,7 @@
 			<defaultValue></defaultValue>
 			<description>Location tag UUID for reception check-ins. Only locations with this tag will be available for reception check-in. Load is balanced across all locations with this tag.</description>
 		</globalProperty>
-	
+
 	<!-- Internationalization -->
 	<!-- All message codes should start with @MODULE_ID@.* -->
 
@@ -98,6 +98,31 @@
 		<description>Ability to send Patient To Queue</description>
 	</privilege>
 
+	<privilege>
+		<name>Task: patientqueueing.checkIn</name>
+		<description>Ability to perform patient check-in</description>
+	</privilege>
+
+	<privilege>
+		<name>Task: patientqueueing.manageQueue</name>
+		<description>Ability to manage queue entries (pick, complete, skip, call)</description>
+	</privilege>
+
+	<privilege>
+		<name>Task: patientqueueing.viewQueue</name>
+		<description>Ability to view queue status and entries</description>
+	</privilege>
+
+	<privilege>
+		<name>App: patientqueueing.selfCheckIn</name>
+		<description>Ability to access self check-in kiosk</description>
+	</privilege>
+
+	<privilege>
+		<name>App: patientqueueing.queueDisplay</name>
+		<description>Ability to access queue display/kiosk view</description>
+	</privilege>
+
 	<messages>
 		<lang>en</lang>
 		<file>messages.properties</file>
@@ -112,4 +137,3 @@
 	</messages>
 	<!-- /Internationalization -->
 </module>
-

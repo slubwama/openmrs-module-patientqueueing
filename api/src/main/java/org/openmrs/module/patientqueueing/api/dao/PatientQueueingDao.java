@@ -25,6 +25,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Repository;
 
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Set;
@@ -472,6 +473,90 @@ public class PatientQueueingDao {
 		criteria.addOrder(Order.asc("dateCreated"));
 		
 		return criteria.list();
+	}
+	
+	/**
+	 * Count pending patient queues by location. Returns a map of location UUID to count. This is
+	 * more efficient than loading all queues and counting in Java.
+	 * 
+	 * @param locations the list of locations to count queues for
+	 * @param fromDate the start date for filtering
+	 * @param toDate the end date for filtering
+	 * @return a map of location UUID to pending queue count
+	 */
+	@SuppressWarnings("unchecked")
+	public java.util.Map<String, Integer> countPendingQueuesByLocation(List<Location> locations, Date fromDate, Date toDate) {
+		StringBuilder sb = new StringBuilder();
+		sb.append("SELECT pq.locationTo.uuid, COUNT(pq.patientQueueId) ");
+		sb.append("FROM patient_queue pq ");
+		sb.append("WHERE pq.dateCreated BETWEEN :fromDate AND :toDate ");
+		sb.append("AND pq.status = :status ");
+		
+		if (locations != null && !locations.isEmpty()) {
+			sb.append("AND pq.locationTo IN (:locations) ");
+		}
+		
+		sb.append("GROUP BY pq.locationTo.uuid");
+		
+		org.hibernate.Query query = getSession().createSQLQuery(sb.toString());
+		query.setParameter("fromDate", fromDate);
+		query.setParameter("toDate", toDate);
+		query.setParameter("status", PatientQueue.Status.PENDING.name());
+		
+		if (locations != null && !locations.isEmpty()) {
+			List<String> locationUuids = new ArrayList<String>();
+			for (Location location : locations) {
+				locationUuids.add(location.getUuid());
+			}
+			query.setParameterList("locations", locationUuids);
+		}
+		
+		java.util.Map<String, Integer> result = new java.util.HashMap<String, Integer>();
+		List<Object[]> rows = query.list();
+		for (Object[] row : rows) {
+			result.put((String) row[0], ((Number) row[1]).intValue());
+		}
+		
+		return result;
+	}
+	
+	/**
+	 * Get all patient queues today for unique patient counting. Returns only patient IDs for
+	 * efficiency, not full Patient objects.
+	 * 
+	 * @param fromDate the start date
+	 * @param toDate the end date
+	 * @return list of unique patient IDs
+	 */
+	@SuppressWarnings("unchecked")
+	public Set<Integer> getUniquePatientIdsForToday(Date fromDate, Date toDate) {
+		String hql = "SELECT DISTINCT pq.patient.patientId FROM patientqueueing.PatientQueue pq "
+		        + "WHERE pq.dateCreated BETWEEN :fromDate AND :toDate " + "AND pq.patient IS NOT NULL";
+		
+		org.hibernate.Query query = getSession().createQuery(hql);
+		query.setParameter("fromDate", fromDate);
+		query.setParameter("toDate", toDate);
+		query.setMaxResults(10000); // Safety limit
+		
+		return new java.util.HashSet(query.list());
+	}
+	
+	/**
+	 * Count all non-patient queues created today.
+	 * 
+	 * @param fromDate the start date
+	 * @param toDate the end date
+	 * @return count of non-patient queues
+	 */
+	public Long countNonPatientQueuesToday(Date fromDate, Date toDate) {
+		String hql = "SELECT COUNT(npq.nonPatientQueueId) FROM patientqueueing.NonPatientQueue npq "
+		        + "WHERE npq.dateCreated BETWEEN :fromDate AND :toDate";
+		
+		org.hibernate.Query query = getSession().createQuery(hql);
+		query.setParameter("fromDate", fromDate);
+		query.setParameter("toDate", toDate);
+		
+		return (Long) query.uniqueResult();
 	}
 	
 }

@@ -31,6 +31,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.Set;
 import java.util.HashSet;
+import java.util.concurrent.locks.ReentrantLock;
 
 import static org.openmrs.module.patientqueueing.PatientQueueingConfig.ROOM_TAG_UUID;
 
@@ -41,6 +42,8 @@ public class PatientQueueingServiceImpl extends BaseOpenmrsService implements Pa
 	private static final int VISIT_NUMBER_INTEGER_START_POSITION = 15;
 	
 	private static final int INTEGER_IN_VISIT_NUMBER_LENGTH = 3;
+	
+	private static final ReentrantLock TICKET_GENERATION_LOCK = new ReentrantLock();
 	
 	public void setDao(PatientQueueingDao dao) {
 		this.dao = dao;
@@ -131,37 +134,34 @@ public class PatientQueueingServiceImpl extends BaseOpenmrsService implements Pa
 		
 		SimpleDateFormat formatterExt = new SimpleDateFormat("dd/MM/yyyy");
 		
-		// Get ALL patient queues for today across ALL locations to ensure facility-wide unique numbers
-		List<PatientQueue> allPatientQueuesToday = getPatientQueueList(null, OpenmrsUtil.firstSecondOfDay(today),
-		    OpenmrsUtil.getLastMomentOfDay(today), null, null, null, null);
-		
-		// Count unique patients who have checked in today across the entire facility
-		Set<Integer> uniquePatientIds = new HashSet<Integer>();
-		for (PatientQueue pq : allPatientQueuesToday) {
-			if (pq.getPatient() != null) {
-				uniquePatientIds.add(pq.getPatient().getPatientId());
-			}
-		}
-		
-		// Next number is count of unique patients + 1
-		int nextNumberInQueue = uniquePatientIds.size() + 1;
-		
 		String dateString = formatterExt.format(today);
 		
-		String locationName = location.getName();
+		String locationName = (location != null && location.getName() != null) ? location.getName() : "LOC";
 		
 		if (locationName.length() > 3) {
 			locationName = locationName.substring(0, 3);
 		}
 		
-		String zeroesToAppend = "";
-		if (nextNumberInQueue <= 9) {
-			zeroesToAppend = "00";
-		} else if (nextNumberInQueue < 100) {
-			zeroesToAppend = "0";
+		TICKET_GENERATION_LOCK.lock();
+		try {
+			Set<Integer> uniquePatientIds = getUniquePatientIdsForToday(OpenmrsUtil.firstSecondOfDay(today),
+			    OpenmrsUtil.getLastMomentOfDay(today));
+			int nextNumberInQueue = uniquePatientIds.size() + 1;
+			
+			return dateString + "-" + locationName + "-" + padTicketNumber(nextNumberInQueue);
 		}
-		
-		return dateString + "-" + locationName + "-" + zeroesToAppend + nextNumberInQueue;
+		finally {
+			TICKET_GENERATION_LOCK.unlock();
+		}
+	}
+	
+	private String padTicketNumber(int number) {
+		if (number <= 9) {
+			return "00" + number;
+		} else if (number < 100) {
+			return "0" + number;
+		}
+		return String.valueOf(number);
 	}
 	
 	/**
@@ -488,31 +488,30 @@ public class PatientQueueingServiceImpl extends BaseOpenmrsService implements Pa
 		Date today = new Date();
 		SimpleDateFormat formatterExt = new SimpleDateFormat("dd/MM/yyyy");
 		
-		// Get ALL non-patient queues for today across ALL queue types to ensure facility-wide unique numbers
-		List<NonPatientQueue> allNonPatientQueuesToday = getNonPatientQueues(null, null, null, null,
-		    OpenmrsUtil.firstSecondOfDay(today), OpenmrsUtil.getLastMomentOfDay(today));
-		
-		// Next number is count of all non-patient entries + 1
-		int nextNumberInQueue = allNonPatientQueuesToday.size() + 1;
-		
 		String dateString = formatterExt.format(today);
 		
-		String locationName = location != null ? location.getName() : "LOC";
-		if (locationName != null && locationName.length() > 3) {
+		String locationName = (location != null && location.getName() != null) ? location.getName() : "LOC";
+		if (locationName.length() > 3) {
 			locationName = locationName.substring(0, 3);
 		}
 		
-		String queueTypeCode = queueType != null && queueType.getUuid() != null ? queueType.getUuid().substring(0, 3)
-		        .toUpperCase() : "XXX";
-		
-		String zeroesToAppend = "";
-		if (nextNumberInQueue <= 9) {
-			zeroesToAppend = "00";
-		} else if (nextNumberInQueue < 100) {
-			zeroesToAppend = "0";
+		String queueTypeCode = "XXX";
+		if (queueType != null && queueType.getUuid() != null) {
+			String uuid = queueType.getUuid();
+			queueTypeCode = uuid.length() >= 3 ? uuid.substring(0, 3).toUpperCase() : uuid.toUpperCase();
 		}
 		
-		return dateString + "-" + locationName + "-" + queueTypeCode + "-" + zeroesToAppend + nextNumberInQueue;
+		TICKET_GENERATION_LOCK.lock();
+		try {
+			Long countToday = countNonPatientQueuesToday(OpenmrsUtil.firstSecondOfDay(today),
+			    OpenmrsUtil.getLastMomentOfDay(today));
+			int nextNumberInQueue = countToday.intValue() + 1;
+			
+			return dateString + "-" + locationName + "-" + queueTypeCode + "-" + padTicketNumber(nextNumberInQueue);
+		}
+		finally {
+			TICKET_GENERATION_LOCK.unlock();
+		}
 	}
 	
 	@Override
@@ -526,5 +525,21 @@ public class PatientQueueingServiceImpl extends BaseOpenmrsService implements Pa
 			return null;
 		}
 		return dao.getNonPatientQueuesInLocationsFifo(childLocations, status, queueType, fromDate, toDate);
+	}
+	
+	@Override
+	public java.util.Map<String, Integer> countPendingQueuesByLocation(java.util.List<Location> locations, Date fromDate,
+	        Date toDate) {
+		return dao.countPendingQueuesByLocation(locations, fromDate, toDate);
+	}
+	
+	@Override
+	public java.util.Set<Integer> getUniquePatientIdsForToday(Date fromDate, Date toDate) {
+		return dao.getUniquePatientIdsForToday(fromDate, toDate);
+	}
+	
+	@Override
+	public Long countNonPatientQueuesToday(Date fromDate, Date toDate) {
+		return dao.countNonPatientQueuesToday(fromDate, toDate);
 	}
 }

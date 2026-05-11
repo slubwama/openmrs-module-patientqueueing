@@ -459,4 +459,38 @@ public interface PatientQueueingService extends OpenmrsService {
 	List<NonPatientQueue> getNonPatientQueuesByParentLocationFifo(Location parentLocation,
 	        NonPatientQueue.NonPatientQueueStatus status, Concept queueType, Date fromDate, Date toDate,
 	        boolean onlyInQueueRooms);
+	
+	/**
+	 * Count pending patient queues by location. Returns a map of location UUID to count. This is
+	 * more efficient than loading all queues and counting in Java.
+	 * 
+	 * @param locations the list of locations to count queues for
+	 * @param fromDate the start date for filtering
+	 * @param toDate the end date for filtering
+	 * @return a map of location UUID to pending queue count
+	 */
+	@Transactional(readOnly = true)
+	java.util.Map<String, Integer> countPendingQueuesByLocation(java.util.List<Location> locations, Date fromDate,
+	        Date toDate);
+	
+	/**
+	 * Get all unique patient IDs for today. Returns only patient IDs for efficiency, not full
+	 * Patient objects.
+	 * 
+	 * @param fromDate the start date
+	 * @param toDate the end date
+	 * @return set of unique patient IDs
+	 */
+	@Transactional(readOnly = true)
+	java.util.Set<Integer> getUniquePatientIdsForToday(Date fromDate, Date toDate);
+	
+	/**
+	 * Count all non-patient queues created today.
+	 * 
+	 * @param fromDate the start date
+	 * @param toDate the end date
+	 * @return count of non-patient queues
+	 */
+	@Transactional(readOnly = true)
+	Long countNonPatientQueuesToday(Date fromDate, Date toDate);
 }
