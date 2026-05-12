@@ -259,4 +259,76 @@ public class NonPatientQueue extends BaseOpenmrsData implements Serializable {
 		}
 		return super.hashCode();
 	}
+	
+	/**
+	 * Builder for creating NonPatientQueue instances.
+	 */
+	public static class Builder {
+		
+		private final NonPatientQueue queue;
+		
+		public Builder() {
+			this.queue = new NonPatientQueue();
+		}
+		
+		public Builder displayName(String displayName) {
+			queue.setDisplayName(displayName);
+			return this;
+		}
+		
+		public Builder phoneNumber(String phoneNumber) {
+			queue.setPhoneNumber(phoneNumber);
+			return this;
+		}
+		
+		public Builder queueType(Concept queueType) {
+			queue.setQueueType(queueType);
+			return this;
+		}
+		
+		public Builder currentLocation(Location currentLocation) {
+			queue.setCurrentLocation(currentLocation);
+			return this;
+		}
+		
+		public Builder locationTo(Location locationTo) {
+			queue.setLocationTo(locationTo);
+			return this;
+		}
+		
+		public Builder queueRoom(Location queueRoom) {
+			queue.setQueueRoom(queueRoom);
+			return this;
+		}
+		
+		public Builder priority(Integer priority) {
+			queue.setPriority(priority);
+			return this;
+		}
+		
+		public Builder comment(String comment) {
+			queue.setComment(comment);
+			return this;
+		}
+		
+		public Builder status(NonPatientQueueStatus status) {
+			queue.setStatus(status);
+			return this;
+		}
+		
+		public Builder ticketNumber(String ticketNumber) {
+			queue.setTicketNumber(ticketNumber);
+			return this;
+		}
+		
+		public NonPatientQueue build() {
+			if (queue.getStatus() == null) {
+				queue.setStatus(NonPatientQueueStatus.WAITING);
+			}
+			if (queue.getDateCreated() == null) {
+				queue.setDateCreated(new java.util.Date());
+			}
+			return queue;
+		}
+	}
 }

@@ -24,6 +24,7 @@ import org.openmrs.module.patientqueueing.model.NonPatientQueue;
 import org.openmrs.module.patientqueueing.model.PatientQueue;
 import org.openmrs.util.OpenmrsUtil;
 
+import java.sql.SQLIntegrityConstraintViolationException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -31,7 +32,6 @@ import java.util.Date;
 import java.util.List;
 import java.util.Set;
 import java.util.HashSet;
-import java.util.concurrent.locks.ReentrantLock;
 
 import static org.openmrs.module.patientqueueing.PatientQueueingConfig.ROOM_TAG_UUID;
 
@@ -43,7 +43,7 @@ public class PatientQueueingServiceImpl extends BaseOpenmrsService implements Pa
 	
 	private static final int INTEGER_IN_VISIT_NUMBER_LENGTH = 3;
 	
-	private static final ReentrantLock TICKET_GENERATION_LOCK = new ReentrantLock();
+	private static final int MAX_TICKET_RETRIES = 10;
 	
 	public void setDao(PatientQueueingDao dao) {
 		this.dao = dao;
@@ -129,30 +129,34 @@ public class PatientQueueingServiceImpl extends BaseOpenmrsService implements Pa
 	 *      org.openmrs.Patient)
 	 */
 	public String generateVisitNumber(Location location, Patient patient) {
-		
 		Date today = new Date();
-		
 		SimpleDateFormat formatterExt = new SimpleDateFormat("dd/MM/yyyy");
 		
 		String dateString = formatterExt.format(today);
-		
 		String locationName = (location != null && location.getName() != null) ? location.getName() : "LOC";
-		
 		if (locationName.length() > 3) {
 			locationName = locationName.substring(0, 3);
 		}
 		
-		TICKET_GENERATION_LOCK.lock();
-		try {
-			Set<Integer> uniquePatientIds = getUniquePatientIdsForToday(OpenmrsUtil.firstSecondOfDay(today),
-			    OpenmrsUtil.getLastMomentOfDay(today));
-			int nextNumberInQueue = uniquePatientIds.size() + 1;
+		Date fromDate = OpenmrsUtil.firstSecondOfDay(today);
+		Date toDate = OpenmrsUtil.getLastMomentOfDay(today);
+		
+		// Cluster-safe: Find an unused ticket number with retry logic
+		Set<Integer> uniquePatientIds = getUniquePatientIdsForToday(fromDate, toDate);
+		int baseNumber = uniquePatientIds.size() + 1;
+		
+		for (int attempt = 0; attempt < MAX_TICKET_RETRIES; attempt++) {
+			int ticketNumber = baseNumber + attempt;
+			String candidateVisitNumber = dateString + "-" + locationName + "-" + padTicketNumber(ticketNumber);
 			
-			return dateString + "-" + locationName + "-" + padTicketNumber(nextNumberInQueue);
+			// Check if this ticket number already exists today
+			List<PatientQueue> existingQueues = dao.getPatientQueueByVisitNumber(candidateVisitNumber, fromDate, toDate);
+			if (existingQueues.isEmpty()) {
+				return candidateVisitNumber;
+			}
 		}
-		finally {
-			TICKET_GENERATION_LOCK.unlock();
-		}
+		
+		throw new APIException("Failed to generate unique ticket number after " + MAX_TICKET_RETRIES + " attempts");
 	}
 	
 	private String padTicketNumber(int number) {
@@ -341,19 +345,11 @@ public class PatientQueueingServiceImpl extends BaseOpenmrsService implements Pa
 	@Override
 	public NonPatientQueue createNonPatientQueueEntry(String displayName, String phoneNumber, Concept queueType,
 	        Location currentLocation, Location locationTo, Location queueRoom, Integer priority, String comment) {
-		NonPatientQueue queue = new NonPatientQueue();
-		queue.setDisplayName(displayName);
-		queue.setPhoneNumber(phoneNumber);
-		queue.setQueueType(queueType);
-		queue.setCurrentLocation(currentLocation);
-		queue.setLocationTo(locationTo);
-		queue.setQueueRoom(queueRoom);
-		queue.setPriority(priority);
-		queue.setComment(comment);
-		queue.setStatus(NonPatientQueue.NonPatientQueueStatus.WAITING);
-		
 		String ticketNumber = generateNonPatientQueueTicketNumber(currentLocation, queueType);
-		queue.setTicketNumber(ticketNumber);
+		
+		NonPatientQueue queue = new NonPatientQueue.Builder().displayName(displayName).phoneNumber(phoneNumber)
+		        .queueType(queueType).currentLocation(currentLocation).locationTo(locationTo).queueRoom(queueRoom)
+		        .priority(priority).comment(comment).ticketNumber(ticketNumber).build();
 		
 		return saveNonPatientQueue(queue);
 	}
@@ -489,7 +485,6 @@ public class PatientQueueingServiceImpl extends BaseOpenmrsService implements Pa
 		SimpleDateFormat formatterExt = new SimpleDateFormat("dd/MM/yyyy");
 		
 		String dateString = formatterExt.format(today);
-		
 		String locationName = (location != null && location.getName() != null) ? location.getName() : "LOC";
 		if (locationName.length() > 3) {
 			locationName = locationName.substring(0, 3);
@@ -501,17 +496,27 @@ public class PatientQueueingServiceImpl extends BaseOpenmrsService implements Pa
 			queueTypeCode = uuid.length() >= 3 ? uuid.substring(0, 3).toUpperCase() : uuid.toUpperCase();
 		}
 		
-		TICKET_GENERATION_LOCK.lock();
-		try {
-			Long countToday = countNonPatientQueuesToday(OpenmrsUtil.firstSecondOfDay(today),
-			    OpenmrsUtil.getLastMomentOfDay(today));
-			int nextNumberInQueue = countToday.intValue() + 1;
+		Date fromDate = OpenmrsUtil.firstSecondOfDay(today);
+		Date toDate = OpenmrsUtil.getLastMomentOfDay(today);
+		
+		// Cluster-safe: Find an unused ticket number with retry logic
+		Long countToday = countNonPatientQueuesToday(fromDate, toDate);
+		int baseNumber = countToday.intValue() + 1;
+		
+		for (int attempt = 0; attempt < MAX_TICKET_RETRIES; attempt++) {
+			int ticketNumber = baseNumber + attempt;
+			String candidateTicketNumber = dateString + "-" + locationName + "-" + queueTypeCode + "-"
+			        + padTicketNumber(ticketNumber);
 			
-			return dateString + "-" + locationName + "-" + queueTypeCode + "-" + padTicketNumber(nextNumberInQueue);
+			// Check if this ticket number already exists today
+			List<NonPatientQueue> existingQueues = dao.getNonPatientQueueByTicketNumber(candidateTicketNumber, fromDate,
+			    toDate);
+			if (existingQueues.isEmpty()) {
+				return candidateTicketNumber;
+			}
 		}
-		finally {
-			TICKET_GENERATION_LOCK.unlock();
-		}
+		
+		throw new APIException("Failed to generate unique ticket number after " + MAX_TICKET_RETRIES + " attempts");
 	}
 	
 	@Override

@@ -15,7 +15,7 @@ import org.openmrs.api.AdministrationService;
 import org.openmrs.api.PatientService;
 import org.openmrs.api.PersonService;
 import org.openmrs.api.context.Context;
-import org.openmrs.module.patientqueueing.PatientQueueingConstants;
+import org.openmrs.module.patientqueueing.PatientQueueingConfig;
 import org.openmrs.module.patientqueueing.web.customdto.SelfCheckInConfig;
 import org.openmrs.module.webservices.rest.web.RequestContext;
 import org.openmrs.module.webservices.rest.web.RestConstants;
@@ -97,9 +97,9 @@ public class SelfCheckInConfigResource extends DelegatingCrudResource<SelfCheckI
 		
 		// Get configured identifier types
 		String identifierTypeUuidsStr = administrationService.getGlobalProperty(
-		    PatientQueueingConstants.GP_SELF_CHECK_IN_IDENTIFIER_TYPE_UUIDS,
-		    PatientQueueingConstants.DEFAULT_PATIENT_ID_IDENTIFIER_TYPE_UUID + ","
-		            + PatientQueueingConstants.DEFAULT_NATIONAL_ID_IDENTIFIER_TYPE_UUID);
+		    PatientQueueingConfig.GP_SELF_CHECK_IN_IDENTIFIER_TYPE_UUIDS,
+		    PatientQueueingConfig.DEFAULT_PATIENT_ID_IDENTIFIER_TYPE_UUID + ","
+		            + PatientQueueingConfig.DEFAULT_NATIONAL_ID_IDENTIFIER_TYPE_UUID);
 		
 		List<SelfCheckInConfig.IdentifierTypeConfig> identifierConfigs = new ArrayList<SelfCheckInConfig.IdentifierTypeConfig>();
 		for (String uuid : identifierTypeUuidsStr.split(",")) {
@@ -130,8 +130,8 @@ public class SelfCheckInConfigResource extends DelegatingCrudResource<SelfCheckI
 		
 		// Get configured person attribute types
 		String attributeTypeUuidsStr = administrationService.getGlobalProperty(
-		    PatientQueueingConstants.GP_SELF_CHECK_IN_PERSON_ATTRIBUTE_TYPE_UUIDS,
-		    PatientQueueingConstants.DEFAULT_PHONE_ATTRIBUTE_TYPE_UUID);
+		    PatientQueueingConfig.GP_SELF_CHECK_IN_PERSON_ATTRIBUTE_TYPE_UUIDS,
+		    PatientQueueingConfig.DEFAULT_PHONE_ATTRIBUTE_TYPE_UUID);
 		
 		List<SelfCheckInConfig.AttributeTypeConfig> attributeConfigs = new ArrayList<SelfCheckInConfig.AttributeTypeConfig>();
 		for (String uuid : attributeTypeUuidsStr.split(",")) {

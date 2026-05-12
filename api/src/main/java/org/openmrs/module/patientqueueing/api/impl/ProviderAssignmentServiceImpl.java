@@ -17,7 +17,7 @@ import org.openmrs.api.APIException;
 import org.openmrs.api.AdministrationService;
 import org.openmrs.api.context.Context;
 import org.openmrs.api.impl.BaseOpenmrsService;
-import org.openmrs.module.patientqueueing.Configuration;
+import org.openmrs.module.patientqueueing.PatientQueueingConfig;
 import org.openmrs.module.patientqueueing.api.PatientQueueingService;
 import org.openmrs.module.patientqueueing.api.ProviderAssignmentService;
 import org.openmrs.module.patientqueueing.api.providerAssignment.LeastBusyProviderStrategy;
@@ -78,8 +78,8 @@ public class ProviderAssignmentServiceImpl extends BaseOpenmrsService implements
 		}
 		
 		AdministrationService adminService = Context.getAdministrationService();
-		String strategyName = adminService.getGlobalProperty(Configuration.GP_PROVIDER_ASSIGNMENT_STRATEGY,
-		    Configuration.DEFAULT_PROVIDER_ASSIGNMENT_STRATEGY);
+		String strategyName = adminService.getGlobalProperty(PatientQueueingConfig.GP_PROVIDER_ASSIGNMENT_STRATEGY,
+		    PatientQueueingConfig.DEFAULT_PROVIDER_ASSIGNMENT_STRATEGY);
 		
 		strategy = createStrategy(strategyName);
 		
@@ -140,13 +140,13 @@ public class ProviderAssignmentServiceImpl extends BaseOpenmrsService implements
 		}
 		
 		switch (strategyName.trim()) {
-			case Configuration.ProviderAssignmentStrategy.LEAST_BUSY:
+			case PatientQueueingConfig.ProviderAssignmentStrategy.LEAST_BUSY:
 				return new LeastBusyProviderStrategy();
-			case Configuration.ProviderAssignmentStrategy.ROUND_ROBIN:
+			case PatientQueueingConfig.ProviderAssignmentStrategy.ROUND_ROBIN:
 				return new RoundRobinProviderStrategy();
-			case Configuration.ProviderAssignmentStrategy.RANDOM:
+			case PatientQueueingConfig.ProviderAssignmentStrategy.RANDOM:
 				return new RandomProviderStrategy();
-			case Configuration.ProviderAssignmentStrategy.MANUAL:
+			case PatientQueueingConfig.ProviderAssignmentStrategy.MANUAL:
 				log.warn("Manual provider assignment strategy selected - will return null");
 				return null;
 			default:

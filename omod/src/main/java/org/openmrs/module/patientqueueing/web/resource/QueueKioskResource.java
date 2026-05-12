@@ -9,7 +9,7 @@ import org.openmrs.PersonAttributeType;
 import org.openmrs.api.AdministrationService;
 import org.openmrs.api.APIException;
 import org.openmrs.api.context.Context;
-import org.openmrs.module.patientqueueing.PatientQueueingConstants;
+import org.openmrs.module.patientqueueing.PatientQueueingConfig;
 import org.openmrs.module.patientqueueing.api.PatientQueueingService;
 import org.openmrs.module.patientqueueing.web.customdto.QueueEntry;
 import org.openmrs.module.patientqueueing.model.NonPatientQueue;

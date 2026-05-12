@@ -21,7 +21,7 @@ import org.openmrs.api.context.Context;
 import org.openmrs.module.patientqueueing.api.PatientQueueingService;
 import org.openmrs.module.patientqueueing.web.customdto.CheckInPatient;
 import org.openmrs.module.patientqueueing.model.PatientQueue;
-import org.openmrs.module.patientqueueing.PatientQueueingConstants;
+import org.openmrs.module.patientqueueing.PatientQueueingConfig;
 import org.openmrs.module.webservices.rest.SimpleObject;
 import org.openmrs.module.webservices.rest.web.RequestContext;
 import org.openmrs.module.webservices.rest.web.RestConstants;
@@ -151,7 +151,7 @@ public class SelfCheckInPatientResource extends DelegatingCrudResource<CheckInPa
 		try {
 			AdministrationService administrationService = Context.getAdministrationService();
 			String visitTypeUuid = administrationService.getGlobalProperty(
-			    PatientQueueingConstants.GP_SELF_CHECK_IN_VISIT_TYPE_UUID, "");
+			    PatientQueueingConfig.GP_SELF_CHECK_IN_VISIT_TYPE_UUID, "");
 			
 			// If no visit type is configured, skip visit creation
 			if (StringUtils.isBlank(visitTypeUuid)) {
@@ -211,7 +211,7 @@ public class SelfCheckInPatientResource extends DelegatingCrudResource<CheckInPa
 		try {
 			AdministrationService administrationService = Context.getAdministrationService();
 			String visitTypeUuid = administrationService.getGlobalProperty(
-			    PatientQueueingConstants.GP_SELF_CHECK_IN_VISIT_TYPE_UUID, "");
+			    PatientQueueingConfig.GP_SELF_CHECK_IN_VISIT_TYPE_UUID, "");
 			
 			if (StringUtils.isBlank(visitTypeUuid)) {
 				return null;
@@ -274,14 +274,14 @@ public class SelfCheckInPatientResource extends DelegatingCrudResource<CheckInPa
 		
 		// Get configured person attribute type UUIDs from global property
 		String personAttributeTypeUuidsStr = administrationService.getGlobalProperty(
-		    PatientQueueingConstants.GP_SELF_CHECK_IN_PERSON_ATTRIBUTE_TYPE_UUIDS,
-		    PatientQueueingConstants.DEFAULT_PHONE_ATTRIBUTE_TYPE_UUID);
+		    PatientQueueingConfig.GP_SELF_CHECK_IN_PERSON_ATTRIBUTE_TYPE_UUIDS,
+		    PatientQueueingConfig.DEFAULT_PHONE_ATTRIBUTE_TYPE_UUID);
 		
 		// Get configured identifier type UUIDs from global property
 		String identifierTypeUuidsStr = administrationService.getGlobalProperty(
-		    PatientQueueingConstants.GP_SELF_CHECK_IN_IDENTIFIER_TYPE_UUIDS,
-		    PatientQueueingConstants.DEFAULT_PATIENT_ID_IDENTIFIER_TYPE_UUID + ","
-		            + PatientQueueingConstants.DEFAULT_NATIONAL_ID_IDENTIFIER_TYPE_UUID);
+		    PatientQueueingConfig.GP_SELF_CHECK_IN_IDENTIFIER_TYPE_UUIDS,
+		    PatientQueueingConfig.DEFAULT_PATIENT_ID_IDENTIFIER_TYPE_UUID + ","
+		            + PatientQueueingConfig.DEFAULT_NATIONAL_ID_IDENTIFIER_TYPE_UUID);
 		
 		// Check if it's a configured attribute type (person attribute like phone number)
 		if (Arrays.asList(personAttributeTypeUuidsStr.split(",")).contains(identifierTypeUuid.trim())) {
