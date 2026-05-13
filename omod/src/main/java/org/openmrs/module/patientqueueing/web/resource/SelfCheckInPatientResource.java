@@ -39,7 +39,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Arrays;
-import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
@@ -306,10 +305,12 @@ public class SelfCheckInPatientResource extends DelegatingCrudResource<CheckInPa
 	}
 	
 	/**
-	 * Find patient by person attribute value using configured attribute types (supports multiple)
+	 * Find patient by person attribute value using configured attribute types (supports multiple).
+	 * Uses efficient database query instead of loading all patients into memory.
 	 */
 	private Patient getPatientByPersonAttributes(String attributeValue, String attributeTypeUuidsStr) {
 		try {
+			PatientQueueingService queueingService = Context.getService(PatientQueueingService.class);
 			String[] uuids = attributeTypeUuidsStr.split(",");
 			
 			for (String uuid : uuids) {
@@ -324,27 +325,12 @@ public class SelfCheckInPatientResource extends DelegatingCrudResource<CheckInPa
 					continue;
 				}
 				
-				// Search patients by person attribute - iterate through all patients
-				List<Patient> allPatients = Context.getPatientService().getAllPatients(false);
-				if (allPatients == null || allPatients.isEmpty()) {
-					continue;
-				}
+				// Use efficient database query instead of loading all patients
+				Patient patient = queueingService.getPatientByPersonAttributeValue(attributeType.getPersonAttributeTypeId(),
+				    attributeValue);
 				
-				List<Patient> matchingPatients = new ArrayList<Patient>();
-				for (Patient p : allPatients) {
-					if (p.getPerson() != null && p.getPerson().getAttribute(attributeType) != null) {
-						String attrValue = p.getPerson().getAttribute(attributeType).getValue();
-						if (attributeValue.equals(attrValue)) {
-							matchingPatients.add(p);
-						}
-					}
-				}
-				
-				if (!matchingPatients.isEmpty()) {
-					if (matchingPatients.size() > 1) {
-						log.warn("Multiple patients found for attribute value: " + attributeValue + ", returning first");
-					}
-					return matchingPatients.get(0);
+				if (patient != null) {
+					return patient;
 				}
 			}
 			
