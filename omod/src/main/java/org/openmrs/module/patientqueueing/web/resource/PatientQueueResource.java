@@ -1,12 +1,5 @@
 package org.openmrs.module.patientqueueing.web.resource;
 
-import io.swagger.models.Model;
-import io.swagger.models.ModelImpl;
-import io.swagger.models.properties.StringProperty;
-import io.swagger.models.properties.BooleanProperty;
-import io.swagger.models.properties.DateProperty;
-import io.swagger.models.properties.RefProperty;
-import io.swagger.models.properties.IntegerProperty;
 import org.openmrs.Location;
 import org.openmrs.api.context.Context;
 import org.openmrs.module.patientqueueing.api.PatientQueueingService;
@@ -289,80 +282,4 @@ public class PatientQueueResource extends DelegatingCrudResource<PatientQueue> {
 		return description;
 	}
 	
-	@Override
-	public Model getGETModel(Representation rep) {
-		ModelImpl model = (ModelImpl) super.getGETModel(rep);
-		if (rep instanceof DefaultRepresentation || rep instanceof FullRepresentation) {
-			model.property("uuid", new StringProperty()).property("dateCreated", new DateProperty())
-			        .property("voided", new BooleanProperty()).property("priority", new IntegerProperty())
-			        .property("priorityComment", new StringProperty()).property("visitNumber", new StringProperty())
-			        .property("comment", new StringProperty()).property("status", new StringProperty())
-			        .property("datePicked", new DateProperty()).property("dateCompleted", new DateProperty());
-		}
-		if (rep instanceof DefaultRepresentation) {
-			model.property("patient", new RefProperty("#/definitions/PatientGetRef"))
-			        .property("creator", new RefProperty("#/definitions/UserGetRef"))
-			        .property("changedBy", new RefProperty("#/definitions/UserGetRef"))
-			        .property("voidedBy", new RefProperty("#/definitions/UserGetRef"))
-			        .property("provider", new RefProperty("#/definitions/ProviderGetRef"))
-			        .property("locationFrom", new RefProperty("#/definitions/LocationGetRef"))
-			        .property("locationTo", new RefProperty("#/definitions/LocationGetRef"))
-			        .property("encounter", new RefProperty("#/definitions/EncounterGetRef"));
-			
-		} else if (rep instanceof FullRepresentation) {
-			model.property("patient", new RefProperty("#/definitions/PatientGetRef"))
-			        .property("creator", new RefProperty("#/definitions/UserGetRef"))
-			        .property("changedBy", new RefProperty("#/definitions/UserGetRef"))
-			        .property("voidedBy", new RefProperty("#/definitions/UserGetRef"))
-			        .property("provider", new RefProperty("#/definitions/ProviderGetRef"))
-			        .property("locationFrom", new RefProperty("#/definitions/LocationGetRef"))
-			        .property("locationTo", new RefProperty("#/definitions/LocationGetRef"))
-			        .property("encounter", new RefProperty("#/definitions/EncounterGetRef"));
-		}
-		return model;
-	}
-	
-	@Override
-	public Model getCREATEModel(Representation rep) {
-		ModelImpl model = (ModelImpl) super.getGETModel(rep);
-		if (rep instanceof DefaultRepresentation || rep instanceof FullRepresentation) {
-			model.property("uuid", new StringProperty()).property("dateCreated", new DateProperty())
-			        .property("voided", new BooleanProperty()).property("status", new StringProperty())
-			        .property("priority", new IntegerProperty()).property("priorityComment", new StringProperty())
-			        .property("visitNumber", new StringProperty()).property("comment", new StringProperty())
-			        .property("status", new StringProperty()).property("datePicked", new DateProperty())
-			        .property("dateCompleted", new DateProperty());
-		}
-		if (rep instanceof DefaultRepresentation) {
-			model.property("patient", new RefProperty("#/definitions/PatientCreate"))
-			        .property("creator", new RefProperty("#/definitions/UserCreate"))
-			        .property("changedBy", new RefProperty("#/definitions/UserCreate"))
-			        .property("voidedBy", new RefProperty("#/definitions/UserCreate"))
-			        .property("provider", new RefProperty("#/definitions/ProviderCreate"))
-			        .property("locationFrom", new RefProperty("#/definitions/LocationCreate"))
-			        .property("locationTo", new RefProperty("#/definitions/LocationCreate"))
-			        .property("encounter", new RefProperty("#/definitions/EncounterCreate"));
-			
-		} else if (rep instanceof FullRepresentation) {
-			model.property("patient", new RefProperty("#/definitions/PatientCreate"))
-			        .property("creator", new RefProperty("#/definitions/UserCreate"))
-			        .property("changedBy", new RefProperty("#/definitions/UserCreate"))
-			        .property("voidedBy", new RefProperty("#/definitions/UserCreate"))
-			        .property("provider", new RefProperty("#/definitions/ProviderCreate"))
-			        .property("locationFrom", new RefProperty("#/definitions/LocationCreate"))
-			        .property("locationTo", new RefProperty("#/definitions/LocationCreate"))
-			        .property("encounter", new RefProperty("#/definitions/EncounterCreate"));
-		}
-		return model;
-	}
-	
-	@Override
-	public Model getUPDATEModel(Representation rep) {
-		return new ModelImpl().property("status", new StringProperty()).property("priority", new IntegerProperty())
-		        .property("priorityComment", new StringProperty()).property("comment", new StringProperty())
-		        .property("encounter", new StringProperty()).property("status", new StringProperty())
-		        .property("datePicked", new DateProperty()).property("dateCompleted", new DateProperty())
-		        .property("provider", new RefProperty("#/definitions/ProviderCreate"))
-		        .property("voided", new BooleanProperty()).property("queueRoom", new BooleanProperty());
-	}
 }

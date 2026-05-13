@@ -31,12 +31,6 @@ public class QueueEntry implements Serializable {
 	private String ticketNumber;
 	
 	/**
-	 * Alias for ticketNumber - used for provider dashboard Maps to: PatientQueue.visitNumber or
-	 * NonPatientQueue.ticketNumber
-	 */
-	private String queueNumber;
-	
-	/**
 	 * The status of this queue entry Maps to: PatientQueue.Status or
 	 * NonPatientQueue.NonPatientQueueStatus
 	 */
@@ -168,7 +162,6 @@ public class QueueEntry implements Serializable {
 	public QueueEntry(org.openmrs.module.patientqueueing.model.PatientQueue patientQueue) {
 		this.uuid = patientQueue.getUuid();
 		this.ticketNumber = patientQueue.getVisitNumber();
-		this.queueNumber = patientQueue.getVisitNumber();
 		this.status = patientQueue.getStatus() != null ? patientQueue.getStatus().name() : null;
 		this.displayName = formatPatientName(patientQueue.getPatient());
 		this.queueType = "PATIENT";
@@ -202,7 +195,6 @@ public class QueueEntry implements Serializable {
 	public QueueEntry(org.openmrs.module.patientqueueing.model.NonPatientQueue nonPatientQueue) {
 		this.uuid = nonPatientQueue.getUuid();
 		this.ticketNumber = nonPatientQueue.getTicketNumber();
-		this.queueNumber = nonPatientQueue.getTicketNumber();
 		this.status = nonPatientQueue.getStatus() != null ? nonPatientQueue.getStatus().name() : null;
 		this.displayName = nonPatientQueue.getDisplayName();
 		this.queueType = "NON_PATIENT";
@@ -257,22 +249,26 @@ public class QueueEntry implements Serializable {
 	
 	public void setTicketNumber(String ticketNumber) {
 		this.ticketNumber = ticketNumber;
-		// Keep both fields in sync for backward compatibility
-		if (this.queueNumber == null) {
-			this.queueNumber = ticketNumber;
-		}
 	}
 	
+	/**
+	 * Get the queue number. This is now an alias for ticketNumber to maintain backward
+	 * compatibility with API clients that expect the queueNumber field.
+	 * 
+	 * @return the ticket number
+	 */
 	public String getQueueNumber() {
-		return queueNumber;
+		return ticketNumber;
 	}
 	
+	/**
+	 * Set the queue number. This is now an alias for ticketNumber to maintain backward
+	 * compatibility with API clients that expect the queueNumber field.
+	 * 
+	 * @param queueNumber the queue number (will be stored as ticketNumber)
+	 */
 	public void setQueueNumber(String queueNumber) {
-		this.queueNumber = queueNumber;
-		// Keep both fields in sync for backward compatibility
-		if (this.ticketNumber == null) {
-			this.ticketNumber = queueNumber;
-		}
+		this.ticketNumber = queueNumber;
 	}
 	
 	public String getStatus() {

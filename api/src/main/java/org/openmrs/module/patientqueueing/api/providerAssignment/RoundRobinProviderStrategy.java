@@ -12,64 +12,64 @@ package org.openmrs.module.patientqueueing.api.providerAssignment;
 import org.openmrs.Location;
 import org.openmrs.Provider;
 
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Assigns providers in a round-robin fashion
  */
 public class RoundRobinProviderStrategy implements ProviderAssignmentStrategy {
-
-	private final Map<String, RoundRobinState> stateMap = new HashMap<>();
-
+	
+	private final Map<String, RoundRobinState> stateMap = new ConcurrentHashMap<String, RoundRobinState>();
+	
+	private final Object lock = new Object();
+	
 	@Override
 	public Provider assignProvider(Location location, List<Provider> availableProviders) {
 		if (availableProviders == null || availableProviders.isEmpty()) {
 			return null;
 		}
-
+		
 		if (availableProviders.size() == 1) {
 			return availableProviders.get(0);
 		}
-
+		
 		String locationKey = location.getUuid();
-
-		RoundRobinState state = stateMap.get(locationKey);
-		if (state == null || state.getProviderList() != availableProviders) {
-			state = new RoundRobinState(availableProviders);
-			stateMap.put(locationKey, state);
+		RoundRobinState state;
+		
+		synchronized (lock) {
+			state = stateMap.get(locationKey);
+			if (state == null || state.getProviderList() != availableProviders) {
+				state = new RoundRobinState(availableProviders);
+				stateMap.put(locationKey, state);
+			}
 		}
-
-		Provider provider = state.getNext();
-		state.incrementIndex();
-
-		return provider;
+		
+		return state.getAndIncrement();
 	}
-
+	
 	@Override
 	public String getName() {
 		return "roundRobin";
 	}
-
+	
 	private static class RoundRobinState {
-
+		
 		private final List<Provider> providerList;
-
+		
 		private int currentIndex = 0;
-
+		
 		public RoundRobinState(List<Provider> providerList) {
 			this.providerList = providerList;
 		}
-
-		public Provider getNext() {
-			return providerList.get(currentIndex);
-		}
-
-		public void incrementIndex() {
+		
+		public synchronized Provider getAndIncrement() {
+			Provider provider = providerList.get(currentIndex);
 			currentIndex = (currentIndex + 1) % providerList.size();
+			return provider;
 		}
-
+		
 		public List<Provider> getProviderList() {
 			return providerList;
 		}

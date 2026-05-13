@@ -45,6 +45,16 @@ public interface PatientQueueingService extends OpenmrsService {
 	public String generateVisitNumber(Location location, Patient patient);
 	
 	/**
+	 * Find a patient by person attribute value using an efficient database query.
+	 * 
+	 * @param personAttributeTypeId the person attribute type ID
+	 * @param attributeValue the attribute value to match
+	 * @return the first matching patient, or null if not found
+	 */
+	@Transactional(readOnly = true)
+	Patient getPatientByPersonAttributeValue(Integer personAttributeTypeId, String attributeValue);
+	
+	/**
 	 * Get a single patient queue record by queueId. The queueId can not be null
 	 * 
 	 * @param queueId Id of the patient queue to be retrieved

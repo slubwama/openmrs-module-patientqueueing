@@ -559,4 +559,26 @@ public class PatientQueueingDao {
 		return (Long) query.uniqueResult();
 	}
 	
+	/**
+	 * Find a patient by person attribute value using an efficient database query.
+	 * 
+	 * @param personAttributeTypeId the person attribute type ID
+	 * @param attributeValue the attribute value to match
+	 * @return the first matching patient, or null if not found
+	 */
+	@SuppressWarnings("unchecked")
+	public Patient getPatientByPersonAttributeValue(Integer personAttributeTypeId, String attributeValue) {
+		String hql = "SELECT p FROM Patient p " + "INNER JOIN p.person person " + "INNER JOIN person.attributes attr "
+		        + "WHERE attr.attributeType.personAttributeTypeId = :attributeTypeId " + "AND attr.value = :attributeValue "
+		        + "AND p.voided = false " + "AND person.voided = false " + "AND attr.voided = false";
+		
+		org.hibernate.Query query = getSession().createQuery(hql);
+		query.setParameter("attributeTypeId", personAttributeTypeId);
+		query.setParameter("attributeValue", attributeValue);
+		query.setMaxResults(1);
+		
+		List<Patient> results = query.list();
+		return results.isEmpty() ? null : results.get(0);
+	}
+	
 }

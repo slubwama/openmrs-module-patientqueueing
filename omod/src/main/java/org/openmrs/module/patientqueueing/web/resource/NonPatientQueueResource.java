@@ -1,12 +1,5 @@
 package org.openmrs.module.patientqueueing.web.resource;
 
-import io.swagger.models.Model;
-import io.swagger.models.ModelImpl;
-import io.swagger.models.properties.BooleanProperty;
-import io.swagger.models.properties.DateProperty;
-import io.swagger.models.properties.IntegerProperty;
-import io.swagger.models.properties.RefProperty;
-import io.swagger.models.properties.StringProperty;
 import org.openmrs.Concept;
 import org.openmrs.Location;
 import org.openmrs.Provider;
@@ -49,10 +42,16 @@ public class NonPatientQueueResource extends DelegatingCrudResource<NonPatientQu
 	public NonPatientQueue save(NonPatientQueue nonPatientQueue) {
 		PatientQueueingService service = Context.getService(PatientQueueingService.class);
 		
-		// Use createNonPatientQueueEntry to ensure ticket number generation and proper status setting
-		return service.createNonPatientQueueEntry(nonPatientQueue.getDisplayName(), nonPatientQueue.getPhoneNumber(),
-		    nonPatientQueue.getQueueType(), nonPatientQueue.getCurrentLocation(), nonPatientQueue.getLocationTo(),
-		    nonPatientQueue.getQueueRoom(), nonPatientQueue.getPriority(), nonPatientQueue.getComment());
+		// Check if this is a new entry (no UUID) or an update
+		if (nonPatientQueue.getUuid() == null || nonPatientQueue.getId() == null) {
+			// New entry - use createNonPatientQueueEntry to ensure ticket number generation
+			return service.createNonPatientQueueEntry(nonPatientQueue.getDisplayName(), nonPatientQueue.getPhoneNumber(),
+			    nonPatientQueue.getQueueType(), nonPatientQueue.getCurrentLocation(), nonPatientQueue.getLocationTo(),
+			    nonPatientQueue.getQueueRoom(), nonPatientQueue.getPriority(), nonPatientQueue.getComment());
+		} else {
+			// Existing entry - update directly without generating new ticket
+			return service.saveNonPatientQueue(nonPatientQueue);
+		}
 	}
 	
 	@Override
@@ -347,64 +346,4 @@ public class NonPatientQueueResource extends DelegatingCrudResource<NonPatientQu
 		return new NeedsPaging<NonPatientQueue>(results, context);
 	}
 	
-	@Override
-	public Model getGETModel(Representation rep) {
-		ModelImpl model = (ModelImpl) super.getGETModel(rep);
-		if (rep instanceof DefaultRepresentation || rep instanceof FullRepresentation) {
-			model.property("uuid", new StringProperty()).property("displayName", new StringProperty())
-			        .property("phoneNumber", new StringProperty()).property("ticketNumber", new StringProperty())
-			        .property("status", new StringProperty()).property("priority", new IntegerProperty())
-			        .property("comment", new StringProperty()).property("calledAt", new DateProperty())
-			        .property("arrivedAt", new DateProperty()).property("startedAt", new DateProperty())
-			        .property("endedAt", new DateProperty());
-		}
-		if (rep instanceof DefaultRepresentation) {
-			model.property("queueType", new RefProperty("#/definitions/ConceptGetRef"))
-			        .property("currentLocation", new RefProperty("#/definitions/LocationGetRef"))
-			        .property("locationTo", new RefProperty("#/definitions/LocationGetRef"))
-			        .property("queueRoom", new RefProperty("#/definitions/LocationGetRef"))
-			        .property("calledBy", new RefProperty("#/definitions/ProviderGetRef"))
-			        .property("servedBy", new RefProperty("#/definitions/ProviderGetRef"));
-		} else if (rep instanceof FullRepresentation) {
-			model.property("queueType", new RefProperty("#/definitions/ConceptGetRef"))
-			        .property("currentLocation", new RefProperty("#/definitions/LocationGetRef"))
-			        .property("locationTo", new RefProperty("#/definitions/LocationGetRef"))
-			        .property("queueRoom", new RefProperty("#/definitions/LocationGetRef"))
-			        .property("calledBy", new RefProperty("#/definitions/ProviderGetRef"))
-			        .property("servedBy", new RefProperty("#/definitions/ProviderGetRef"))
-			        .property("creator", new RefProperty("#/definitions/UserGetRef"))
-			        .property("changedBy", new RefProperty("#/definitions/UserGetRef"))
-			        .property("voidedBy", new RefProperty("#/definitions/UserGetRef"));
-		}
-		return model;
-	}
-	
-	@Override
-	public Model getCREATEModel(Representation rep) {
-		ModelImpl model = (ModelImpl) super.getCREATEModel(rep);
-		if (rep instanceof DefaultRepresentation || rep instanceof FullRepresentation) {
-			model.property("displayName", new StringProperty()).property("phoneNumber", new StringProperty())
-			        .property("priority", new IntegerProperty()).property("comment", new StringProperty());
-		}
-		if (rep instanceof DefaultRepresentation) {
-			model.property("queueType", new RefProperty("#/definitions/ConceptCreate"))
-			        .property("currentLocation", new RefProperty("#/definitions/LocationCreate"))
-			        .property("locationTo", new RefProperty("#/definitions/LocationCreate"))
-			        .property("queueRoom", new RefProperty("#/definitions/LocationCreate"));
-		} else if (rep instanceof FullRepresentation) {
-			model.property("queueType", new RefProperty("#/definitions/ConceptCreate"))
-			        .property("currentLocation", new RefProperty("#/definitions/LocationCreate"))
-			        .property("locationTo", new RefProperty("#/definitions/LocationCreate"))
-			        .property("queueRoom", new RefProperty("#/definitions/LocationCreate"));
-		}
-		return model;
-	}
-	
-	@Override
-	public Model getUPDATEModel(Representation rep) {
-		return new ModelImpl().property("displayName", new StringProperty()).property("phoneNumber", new StringProperty())
-		        .property("priority", new IntegerProperty()).property("comment", new StringProperty())
-		        .property("queueType", new StringProperty()).property("currentLocation", new StringProperty())
-		        .property("locationTo", new StringProperty()).property("queueRoom", new StringProperty());
-	}
 }
