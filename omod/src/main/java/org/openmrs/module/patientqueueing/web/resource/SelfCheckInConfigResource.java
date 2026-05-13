@@ -97,9 +97,7 @@ public class SelfCheckInConfigResource extends DelegatingCrudResource<SelfCheckI
 		
 		// Get configured identifier types
 		String identifierTypeUuidsStr = administrationService.getGlobalProperty(
-		    PatientQueueingConfig.GP_SELF_CHECK_IN_IDENTIFIER_TYPE_UUIDS,
-		    PatientQueueingConfig.DEFAULT_PATIENT_ID_IDENTIFIER_TYPE_UUID + ","
-		            + PatientQueueingConfig.DEFAULT_NATIONAL_ID_IDENTIFIER_TYPE_UUID);
+		    PatientQueueingConfig.GP_SELF_CHECK_IN_IDENTIFIER_TYPE_UUIDS, "");
 		
 		List<SelfCheckInConfig.IdentifierTypeConfig> identifierConfigs = new ArrayList<SelfCheckInConfig.IdentifierTypeConfig>();
 		for (String uuid : identifierTypeUuidsStr.split(",")) {
@@ -130,8 +128,7 @@ public class SelfCheckInConfigResource extends DelegatingCrudResource<SelfCheckI
 		
 		// Get configured person attribute types
 		String attributeTypeUuidsStr = administrationService.getGlobalProperty(
-		    PatientQueueingConfig.GP_SELF_CHECK_IN_PERSON_ATTRIBUTE_TYPE_UUIDS,
-		    PatientQueueingConfig.DEFAULT_PHONE_ATTRIBUTE_TYPE_UUID);
+		    PatientQueueingConfig.GP_SELF_CHECK_IN_PERSON_ATTRIBUTE_TYPE_UUIDS, "");
 		
 		List<SelfCheckInConfig.AttributeTypeConfig> attributeConfigs = new ArrayList<SelfCheckInConfig.AttributeTypeConfig>();
 		for (String uuid : attributeTypeUuidsStr.split(",")) {

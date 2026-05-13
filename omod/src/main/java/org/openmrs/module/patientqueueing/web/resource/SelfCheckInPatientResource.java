@@ -273,14 +273,18 @@ public class SelfCheckInPatientResource extends DelegatingCrudResource<CheckInPa
 		
 		// Get configured person attribute type UUIDs from global property
 		String personAttributeTypeUuidsStr = administrationService.getGlobalProperty(
-		    PatientQueueingConfig.GP_SELF_CHECK_IN_PERSON_ATTRIBUTE_TYPE_UUIDS,
-		    PatientQueueingConfig.DEFAULT_PHONE_ATTRIBUTE_TYPE_UUID);
+		    PatientQueueingConfig.GP_SELF_CHECK_IN_PERSON_ATTRIBUTE_TYPE_UUIDS, "");
 		
 		// Get configured identifier type UUIDs from global property
 		String identifierTypeUuidsStr = administrationService.getGlobalProperty(
-		    PatientQueueingConfig.GP_SELF_CHECK_IN_IDENTIFIER_TYPE_UUIDS,
-		    PatientQueueingConfig.DEFAULT_PATIENT_ID_IDENTIFIER_TYPE_UUID + ","
-		            + PatientQueueingConfig.DEFAULT_NATIONAL_ID_IDENTIFIER_TYPE_UUID);
+		    PatientQueueingConfig.GP_SELF_CHECK_IN_IDENTIFIER_TYPE_UUIDS, "");
+		
+		// Check if self check-in is properly configured
+		if (StringUtils.isBlank(personAttributeTypeUuidsStr) && StringUtils.isBlank(identifierTypeUuidsStr)) {
+			log.error("Self check-in is not configured. Please contact your system administrator to configure person attribute types and identifier types.");
+			throw new IllegalArgumentException(
+			        "Self check-in is not configured. Please contact your system administrator to set up the required configurations.");
+		}
 		
 		// Check if it's a configured attribute type (person attribute like phone number)
 		if (Arrays.asList(personAttributeTypeUuidsStr.split(",")).contains(identifierTypeUuid.trim())) {
