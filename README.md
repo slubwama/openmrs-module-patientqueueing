@@ -180,10 +180,10 @@ The **Patient Queue UI Module** provides a user interface built on the OpenMRS A
 
 ## Documentation
 
-- **[API Documentation](API_DOCUMENTATION.md)**: Complete REST API reference
-- **[Configuration Guide](CONFIGURATION.md)**: Global properties and setup
-- **[Migration Progress](MIGRATION_PROGRESS.md)**: Implementation status and roadmap
-- **[Self Check-in Migration Plan](SELF_CHECKIN_MIGRATION_PLAN.md)**: Migration details
+- **[API Documentation](docs/API_DOCUMENTATION.md)**: Complete REST API reference
+- **[Configuration Guide](docs/CONFIGURATION.md)**: Global properties and setup
+- **[Migration Progress](docs/MIGRATION_PROGRESS.md)**: Implementation status and roadmap
+- **[Self Check-in Migration Plan](docs/SELF_CHECKIN_MIGRATION_PLAN.md)**: Migration details
 
 ---
 
@@ -225,7 +225,7 @@ Current test coverage: **39 tests passing**
 
 ## Configuration
 
-See [CONFIGURATION.md](CONFIGURATION.md) for detailed configuration options including:
+See [CONFIGURATION.md](docs/CONFIGURATION.md) for detailed configuration options including:
 
 - Queue type concepts
 - Provider assignment strategies
@@ -244,7 +244,7 @@ If migrating from UgandaEMR's self check-in module:
    - `/ws/rest/v1/selfcheckinpatient` → `/ws/rest/v1/patientqueueing/checkin/checkInPatient`
 4. Test in staging environment
 
-See [MIGRATION_PROGRESS.md](MIGRATION_PROGRESS.md) for detailed migration guide.
+See [MIGRATION_PROGRESS.md](docs/MIGRATION_PROGRESS.md) for detailed migration guide.
 
 ---
 
