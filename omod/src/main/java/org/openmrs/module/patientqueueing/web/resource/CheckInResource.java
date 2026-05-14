@@ -4,7 +4,9 @@ import org.openmrs.Concept;
 import org.openmrs.Location;
 import org.openmrs.Patient;
 import org.openmrs.api.APIException;
+import org.openmrs.api.AdministrationService;
 import org.openmrs.api.context.Context;
+import org.openmrs.module.patientqueueing.PatientQueueingConfig;
 import org.openmrs.module.patientqueueing.api.PatientQueueingService;
 import org.openmrs.module.patientqueueing.web.customdto.CheckInResult;
 import org.openmrs.module.patientqueueing.web.customdto.QueueEntry;
@@ -14,6 +16,8 @@ import org.openmrs.module.webservices.rest.web.RequestContext;
 import org.openmrs.module.webservices.rest.web.RestConstants;
 import org.openmrs.module.webservices.rest.web.annotation.Resource;
 import org.openmrs.util.OpenmrsUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Date;
 import java.util.List;
@@ -24,6 +28,8 @@ import java.util.UUID;
  */
 @Resource(name = RestConstants.VERSION_1 + "/patientqueueing/checkin", supportedClass = CheckInResult.class, supportedOpenmrsVersions = { "1.9.* - 9.*" })
 public class CheckInResource {
+	
+	private static final Logger log = LoggerFactory.getLogger(CheckInResource.class);
 	
 	/**
 	 * Perform self check-in for a patient
@@ -88,8 +94,8 @@ public class CheckInResource {
 			// Calculate queue position
 			int queuePosition = calculatePatientQueuePosition(service, location, queueRoom);
 			
-			// Calculate estimated wait time (5 minutes per person ahead)
-			int estimatedWaitMinutes = queuePosition * 5;
+			// Calculate estimated wait time (configured minutes per person ahead)
+			int estimatedWaitMinutes = queuePosition * getEstimatedWaitMinutesPerPerson();
 			
 			// Create result
 			CheckInResult result = new CheckInResult();
@@ -182,8 +188,8 @@ public class CheckInResource {
 			// Calculate queue position
 			int queuePosition = calculateNonPatientQueuePosition(service, location, queueRoom);
 			
-			// Calculate estimated wait time (5 minutes per person ahead)
-			int estimatedWaitMinutes = queuePosition * 5;
+			// Calculate estimated wait time (configured minutes per person ahead)
+			int estimatedWaitMinutes = queuePosition * getEstimatedWaitMinutesPerPerson();
 			
 			// Create result
 			CheckInResult result = new CheckInResult();
@@ -236,5 +242,35 @@ public class CheckInResource {
 		    location, queueRoom, fromDate, toDate);
 		
 		return queues.size();
+	}
+	
+	/**
+	 * Get the estimated wait minutes per person from global property.
+	 * 
+	 * @return the configured minutes per person, default 5 if not configured or invalid
+	 */
+	private int getEstimatedWaitMinutesPerPerson() {
+		try {
+			AdministrationService adminService = Context.getAdministrationService();
+			String value = adminService.getGlobalProperty(PatientQueueingConfig.GP_ESTIMATED_WAIT_MINUTES_PER_PERSON,
+			    String.valueOf(PatientQueueingConfig.DEFAULT_ESTIMATED_WAIT_MINUTES_PER_PERSON));
+			int minutes = Integer.parseInt(value);
+			if (minutes <= 0) {
+				log.warn("Invalid estimated wait minutes per person: {}, using default: {}", minutes,
+				    PatientQueueingConfig.DEFAULT_ESTIMATED_WAIT_MINUTES_PER_PERSON);
+				return PatientQueueingConfig.DEFAULT_ESTIMATED_WAIT_MINUTES_PER_PERSON;
+			}
+			return minutes;
+		}
+		catch (NumberFormatException e) {
+			log.warn("Invalid estimated wait minutes per person format, using default: {}",
+			    PatientQueueingConfig.DEFAULT_ESTIMATED_WAIT_MINUTES_PER_PERSON, e);
+			return PatientQueueingConfig.DEFAULT_ESTIMATED_WAIT_MINUTES_PER_PERSON;
+		}
+		catch (Exception e) {
+			log.warn("Error reading estimated wait minutes per person, using default: {}",
+			    PatientQueueingConfig.DEFAULT_ESTIMATED_WAIT_MINUTES_PER_PERSON, e);
+			return PatientQueueingConfig.DEFAULT_ESTIMATED_WAIT_MINUTES_PER_PERSON;
+		}
 	}
 }

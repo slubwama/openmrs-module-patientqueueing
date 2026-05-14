@@ -80,6 +80,12 @@
 			<description>Location tag UUID for reception check-ins. Only locations with this tag will be available for reception check-in. Load is balanced across all locations with this tag.</description>
 		</globalProperty>
 
+	<globalProperty>
+		<property>patientqueueing.estimatedWaitMinutesPerPerson</property>
+		<defaultValue>5</defaultValue>
+		<description>Estimated minutes of wait time per person ahead in queue. Used to calculate estimated wait time for self check-in.</description>
+	</globalProperty>
+
 	<!-- Internationalization -->
 	<!-- All message codes should start with @MODULE_ID@.* -->
 

@@ -24,6 +24,8 @@ import org.openmrs.module.webservices.rest.web.resource.api.PageableResult;
 import org.openmrs.module.webservices.rest.web.resource.impl.DelegatingCrudResource;
 import org.openmrs.module.webservices.rest.web.resource.impl.DelegatingResourceDescription;
 import org.openmrs.module.webservices.rest.web.response.ResponseException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -35,6 +37,8 @@ import java.util.List;
  */
 @Resource(name = RestConstants.VERSION_1 + "/selfcheckinconfig", supportedClass = SelfCheckInConfig.class, supportedOpenmrsVersions = { "1.9.* - 9.*" })
 public class SelfCheckInConfigResource extends DelegatingCrudResource<SelfCheckInConfig> {
+	
+	private static final Logger log = LoggerFactory.getLogger(SelfCheckInConfigResource.class);
 	
 	@Override
 	public SelfCheckInConfig newDelegate() {
@@ -120,7 +124,7 @@ public class SelfCheckInConfigResource extends DelegatingCrudResource<SelfCheckI
 				}
 			}
 			catch (Exception e) {
-				// Skip invalid UUIDs
+				log.warn("Invalid identifier type UUID: " + uuid, e);
 			}
 		}
 		
@@ -153,7 +157,7 @@ public class SelfCheckInConfigResource extends DelegatingCrudResource<SelfCheckI
 				}
 			}
 			catch (Exception e) {
-				// Skip invalid UUIDs
+				log.warn("Invalid attribute type UUID: " + uuid, e);
 			}
 		}
 		

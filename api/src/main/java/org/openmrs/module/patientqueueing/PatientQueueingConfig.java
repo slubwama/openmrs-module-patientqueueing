@@ -51,6 +51,8 @@ public final class PatientQueueingConfig {
 	
 	public static final String GP_NON_PATIENT_QUEUE_TYPE_CONCEPTS = "patientqueueing.nonPatientQueueTypeConceptUuids";
 	
+	public static final String GP_ESTIMATED_WAIT_MINUTES_PER_PERSON = "patientqueueing.estimatedWaitMinutesPerPerson";
+	
 	// Global Property Names - Self Check-In
 	
 	public static final String GP_SELF_CHECK_IN_PERSON_ATTRIBUTE_TYPE_UUIDS = "patientqueueing.selfCheckInPersonAttributeTypeUuids";
@@ -68,6 +70,8 @@ public final class PatientQueueingConfig {
 	public static final String DEFAULT_PROVIDER_ASSIGNMENT_STRATEGY = "leastBusy";
 	
 	public static final boolean DEFAULT_AUTO_CREATE_VISIT = true;
+	
+	public static final int DEFAULT_ESTIMATED_WAIT_MINUTES_PER_PERSON = 5;
 	
 	public static final int DEFAULT_PRIORITY = 5;
 	

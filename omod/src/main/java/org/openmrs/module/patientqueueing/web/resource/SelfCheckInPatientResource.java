@@ -347,32 +347,6 @@ public class SelfCheckInPatientResource extends DelegatingCrudResource<CheckInPa
 	}
 	
 	/**
-	 * Find patient by identifier using configured identifier types
-	 */
-	private Patient getPatientByIdentifierTypes(String identifierValue, String identifierTypeUuidsStr) {
-		try {
-			String[] uuids = identifierTypeUuidsStr.split(",");
-			
-			for (String uuid : uuids) {
-				uuid = uuid.trim();
-				if (StringUtils.isBlank(uuid)) {
-					continue;
-				}
-				
-				Patient patient = getPatientByIdentifier(identifierValue, uuid);
-				if (patient != null) {
-					return patient;
-				}
-			}
-		}
-		catch (Exception e) {
-			log.error("Error finding patient by identifier", e);
-		}
-		
-		return null;
-	}
-	
-	/**
 	 * Find patient by specific identifier type
 	 */
 	private Patient getPatientByIdentifier(String identifierValue, String identifierTypeUuid) {
