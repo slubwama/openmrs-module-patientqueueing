@@ -188,6 +188,9 @@ public class QueueDisplayResource extends DelegatingCrudResource<QueueDisplayDto
 		if (patientQueues != null) {
 			for (PatientQueue pq : patientQueues) {
 				PatientQueue.Status st = pq.getStatus();
+				if (st == null) {
+					continue;
+				}
 				
 				boolean isNow = st == PatientQueue.Status.PICKED;
 				boolean isNext = st == PatientQueue.Status.PENDING;
@@ -204,6 +207,9 @@ public class QueueDisplayResource extends DelegatingCrudResource<QueueDisplayDto
 		if (nonPatientQueues != null) {
 			for (NonPatientQueue pq : nonPatientQueues) {
 				NonPatientQueue.NonPatientQueueStatus st = pq.getStatus();
+				if (st == null) {
+					continue;
+				}
 				
 				boolean isNow = st == NonPatientQueue.NonPatientQueueStatus.CALLED
 				        || st == NonPatientQueue.NonPatientQueueStatus.SERVING

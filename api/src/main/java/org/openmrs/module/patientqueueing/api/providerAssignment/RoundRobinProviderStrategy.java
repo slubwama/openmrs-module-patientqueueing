@@ -35,6 +35,10 @@ public class RoundRobinProviderStrategy implements ProviderAssignmentStrategy {
 			return availableProviders.get(0);
 		}
 		
+		if (location == null || location.getUuid() == null) {
+			throw new IllegalArgumentException("Location with non-null UUID required");
+		}
+		
 		String locationKey = location.getUuid();
 		RoundRobinState state;
 		

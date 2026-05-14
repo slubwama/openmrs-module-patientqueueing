@@ -28,10 +28,11 @@ import java.sql.SQLIntegrityConstraintViolationException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.HashSet;
 
 import static org.openmrs.module.patientqueueing.PatientQueueingConfig.ROOM_TAG_UUID;
 
@@ -276,7 +277,7 @@ public class PatientQueueingServiceImpl extends BaseOpenmrsService implements Pa
         flattenLocationHierarchy(parentLocation, childLocations, queueRomTag, onlyInQueueRooms);
 
         if (childLocations.isEmpty()) {
-            return null;
+            return Collections.emptyList();
         }
         return dao.getPatientsInQueueRoom(childLocations, status, fromDate, toDate);
     }
@@ -334,7 +335,7 @@ public class PatientQueueingServiceImpl extends BaseOpenmrsService implements Pa
 		flattenLocationHierarchy(parentLocation, childLocations, queueRomTag, onlyInQueueRooms);
 
 		if (childLocations.isEmpty()) {
-			return null;
+			return Collections.emptyList();
 		}
 		return dao.getPatientsInQueueRoomFifo(childLocations, status, fromDate, toDate);
 	}
@@ -411,6 +412,9 @@ public class PatientQueueingServiceImpl extends BaseOpenmrsService implements Pa
 	
 	@Override
 	public NonPatientQueue callNonPatientQueue(NonPatientQueue queue, Provider provider) {
+		if (queue == null) {
+			throw new IllegalArgumentException("Queue cannot be null");
+		}
 		if (queue.getStatus() != NonPatientQueue.NonPatientQueueStatus.WAITING) {
 			throw new APIException("Can only call queue entries with status WAITING");
 		}
@@ -424,6 +428,9 @@ public class PatientQueueingServiceImpl extends BaseOpenmrsService implements Pa
 	
 	@Override
 	public NonPatientQueue markNonPatientQueueArrived(NonPatientQueue queue) {
+		if (queue == null) {
+			throw new IllegalArgumentException("Queue cannot be null");
+		}
 		if (queue.getStatus() != NonPatientQueue.NonPatientQueueStatus.CALLED) {
 			throw new APIException("Can only mark as arrived queue entries with status CALLED");
 		}
@@ -436,6 +443,9 @@ public class PatientQueueingServiceImpl extends BaseOpenmrsService implements Pa
 	
 	@Override
 	public NonPatientQueue startServingNonPatientQueue(NonPatientQueue queue, Provider provider) {
+		if (queue == null) {
+			throw new IllegalArgumentException("Queue cannot be null");
+		}
 		if (queue.getStatus() != NonPatientQueue.NonPatientQueueStatus.ARRIVED) {
 			throw new APIException("Can only start serving queue entries with status ARRIVED");
 		}
@@ -449,6 +459,9 @@ public class PatientQueueingServiceImpl extends BaseOpenmrsService implements Pa
 	
 	@Override
 	public NonPatientQueue completeNonPatientQueue(NonPatientQueue queue, Provider provider) {
+		if (queue == null) {
+			throw new IllegalArgumentException("Queue cannot be null");
+		}
 		if (queue.getStatus() != NonPatientQueue.NonPatientQueueStatus.SERVING) {
 			throw new APIException("Can only complete queue entries with status SERVING");
 		}
@@ -464,6 +477,9 @@ public class PatientQueueingServiceImpl extends BaseOpenmrsService implements Pa
 	
 	@Override
 	public NonPatientQueue skipNonPatientQueue(NonPatientQueue queue) {
+		if (queue == null) {
+			throw new IllegalArgumentException("Queue cannot be null");
+		}
 		if (queue.getStatus() != NonPatientQueue.NonPatientQueueStatus.CALLED) {
 			throw new APIException("Can only skip queue entries with status CALLED");
 		}
@@ -477,6 +493,9 @@ public class PatientQueueingServiceImpl extends BaseOpenmrsService implements Pa
 	
 	@Override
 	public NonPatientQueue cancelNonPatientQueue(NonPatientQueue queue) {
+		if (queue == null) {
+			throw new IllegalArgumentException("Queue cannot be null");
+		}
 		if (queue.getStatus() == NonPatientQueue.NonPatientQueueStatus.COMPLETED
 		        || queue.getStatus() == NonPatientQueue.NonPatientQueueStatus.CANCELLED) {
 			throw new APIException("Cannot cancel queue entries that are completed or already cancelled");
@@ -536,7 +555,7 @@ public class PatientQueueingServiceImpl extends BaseOpenmrsService implements Pa
 		flattenLocationHierarchy(parentLocation, childLocations, queueRoomTag, onlyInQueueRooms);
 
 		if (childLocations.isEmpty()) {
-			return null;
+			return Collections.emptyList();
 		}
 		return dao.getNonPatientQueuesInLocationsFifo(childLocations, status, queueType, fromDate, toDate);
 	}

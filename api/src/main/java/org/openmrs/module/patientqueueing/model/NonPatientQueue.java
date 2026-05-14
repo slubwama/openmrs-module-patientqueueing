@@ -244,7 +244,7 @@ public class NonPatientQueue extends BaseOpenmrsData implements Serializable {
 			if (this.getNonPatientQueueId() != null && q.getNonPatientQueueId() != null) {
 				return this.getNonPatientQueueId().equals(q.getNonPatientQueueId());
 			}
-			return this.getUuid().equals(q.getUuid());
+			return java.util.Objects.equals(this.getUuid(), q.getUuid());
 		}
 		return false;
 	}

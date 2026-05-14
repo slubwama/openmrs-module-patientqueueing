@@ -207,7 +207,7 @@ public interface PatientQueueingService extends OpenmrsService {
 	 * @param queueRoom the specific room where the provider is at the time of picking the patient
 	 * @return the queue which has been picked
 	 */
-	@Transactional(readOnly = true)
+	@Transactional
 	PatientQueue pickPatientQueue(PatientQueue patientQueue, Provider provider, Location queueRoom);
 	
 	/**

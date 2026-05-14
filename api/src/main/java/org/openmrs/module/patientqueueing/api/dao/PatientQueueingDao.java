@@ -94,6 +94,7 @@ public class PatientQueueingDao {
 		if (queueRoom != null) {
 			criteria.add(Restrictions.eq("queueRoom", queueRoom));
 		}
+		criteria.add(Restrictions.eq("voided", false));
 		
 		criteria.addOrder(Order.desc("dateCreated"));
 		
@@ -206,6 +207,7 @@ public class PatientQueueingDao {
 			criteria.add(Restrictions.in("queueRoom", queueRooms));
 		}
 		
+		criteria.add(Restrictions.eq("voided", false));
 		criteria.addOrder(Order.desc("dateCreated"));
 		return criteria.list();
 	}
@@ -256,6 +258,7 @@ public class PatientQueueingDao {
 		if (queueRoom != null) {
 			criteria.add(Restrictions.eq("queueRoom", queueRoom));
 		}
+		criteria.add(Restrictions.eq("voided", false));
 		
 		criteria.addOrder(Order.asc("dateCreated"));
 		return criteria.list();
@@ -347,6 +350,7 @@ public class PatientQueueingDao {
 		if (fromDate != null && toDate != null) {
 			criteria.add(Restrictions.between("dateCreated", fromDate, toDate));
 		}
+		criteria.add(Restrictions.eq("voided", false));
 		
 		criteria.addOrder(Order.asc("dateCreated"));
 		
@@ -371,6 +375,7 @@ public class PatientQueueingDao {
 		if (status != null) {
 			criteria.add(Restrictions.eq("status", status));
 		}
+		criteria.add(Restrictions.eq("voided", false));
 		
 		criteria.addOrder(Order.asc("dateCreated"));
 		
@@ -424,6 +429,7 @@ public class PatientQueueingDao {
 			criteria.add(Restrictions.between("dateCreated", fromDate, toDate));
 		}
 		
+		criteria.add(Restrictions.eq("voided", false));
 		criteria.addOrder(Order.asc("dateCreated"));
 		
 		return criteria.list();
@@ -470,6 +476,7 @@ public class PatientQueueingDao {
 			criteria.add(Restrictions.between("dateCreated", fromDate, toDate));
 		}
 		
+		criteria.add(Restrictions.eq("voided", false));
 		criteria.addOrder(Order.asc("dateCreated"));
 		
 		return criteria.list();
@@ -487,16 +494,17 @@ public class PatientQueueingDao {
 	@SuppressWarnings("unchecked")
 	public java.util.Map<String, Integer> countPendingQueuesByLocation(List<Location> locations, Date fromDate, Date toDate) {
 		StringBuilder sb = new StringBuilder();
-		sb.append("SELECT pq.locationTo.uuid, COUNT(pq.patientQueueId) ");
+		sb.append("SELECT pq.location_to_uuid, COUNT(pq.patient_queue_id) ");
 		sb.append("FROM patient_queue pq ");
-		sb.append("WHERE pq.dateCreated BETWEEN :fromDate AND :toDate ");
+		sb.append("WHERE pq.date_created BETWEEN :fromDate AND :toDate ");
 		sb.append("AND pq.status = :status ");
+		sb.append("AND pq.voided = 0 ");
 		
 		if (locations != null && !locations.isEmpty()) {
-			sb.append("AND pq.locationTo IN (:locations) ");
+			sb.append("AND pq.location_to_uuid IN (:locations) ");
 		}
 		
-		sb.append("GROUP BY pq.locationTo.uuid");
+		sb.append("GROUP BY pq.location_to_uuid");
 		
 		org.hibernate.Query query = getSession().createSQLQuery(sb.toString());
 		query.setParameter("fromDate", fromDate);
@@ -531,7 +539,8 @@ public class PatientQueueingDao {
 	@SuppressWarnings("unchecked")
 	public Set<Integer> getUniquePatientIdsForToday(Date fromDate, Date toDate) {
 		String hql = "SELECT DISTINCT pq.patient.patientId FROM patientqueueing.PatientQueue pq "
-		        + "WHERE pq.dateCreated BETWEEN :fromDate AND :toDate " + "AND pq.patient IS NOT NULL";
+		        + "WHERE pq.dateCreated BETWEEN :fromDate AND :toDate " + "AND pq.patient IS NOT NULL "
+		        + "AND pq.voided = false";
 		
 		org.hibernate.Query query = getSession().createQuery(hql);
 		query.setParameter("fromDate", fromDate);
