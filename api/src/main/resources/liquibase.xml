@@ -302,31 +302,4 @@
             <column name="location_to"/>
         </createIndex>
     </changeSet>
-
-    <!-- Cluster-safe ticket generation: unique constraints on ticket numbers -->
-    <changeSet author="slubwama" id="patientqueue_cluster_safe_tickets-1">
-        <preConditions onFail="MARK_RAN">
-            <tableExists tableName="patient_queue"/>
-            <not><indexExists tableName="patient_queue" indexName="idx_pq_visit_number_unique"/></not>
-        </preConditions>
-        <comment>
-            Add unique constraint on visit_number for cluster-safe ticket generation.
-            Prevents duplicate ticket numbers across multiple application nodes.
-        </comment>
-        <createUniqueConstraint tableName="patient_queue" constraintName="idx_pq_visit_number_unique"
-                                columnNames="visit_number"/>
-    </changeSet>
-
-    <changeSet author="slubwama" id="patientqueue_cluster_safe_tickets-2">
-        <preConditions onFail="MARK_RAN">
-            <tableExists tableName="non_patient_queue"/>
-            <not><indexExists tableName="non_patient_queue" indexName="idx_npq_ticket_number_unique"/></not>
-        </preConditions>
-        <comment>
-            Add unique constraint on ticket_number for cluster-safe non-patient ticket generation.
-            Prevents duplicate ticket numbers across multiple application nodes.
-        </comment>
-        <createUniqueConstraint tableName="non_patient_queue" constraintName="idx_npq_ticket_number_unique"
-                                columnNames="ticket_number"/>
-    </changeSet>
 </databaseChangeLog>
