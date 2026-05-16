@@ -3,8 +3,11 @@ package org.openmrs.module.patientqueueing.web.resource;
 import org.openmrs.Concept;
 import org.openmrs.Location;
 import org.openmrs.Patient;
+import org.openmrs.Visit;
+import org.openmrs.VisitType;
 import org.openmrs.api.APIException;
 import org.openmrs.api.AdministrationService;
+import org.openmrs.api.VisitService;
 import org.openmrs.api.context.Context;
 import org.openmrs.module.patientqueueing.PatientQueueingConfig;
 import org.openmrs.module.patientqueueing.api.PatientQueueingService;
@@ -19,6 +22,7 @@ import org.openmrs.util.OpenmrsUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
 import java.util.UUID;
@@ -76,6 +80,13 @@ public class CheckInResource {
 		}
 		
 		try {
+			// Ensure patient has a visit for today (create or reuse existing)
+			Visit visit = ensurePatientVisitForToday(patient, location);
+			if (visit == null) {
+				log.warn("Could not create or find visit for patient " + patient.getPatientId()
+				        + ". Proceeding with queue entry only.");
+			}
+			
 			// Create patient queue entry
 			PatientQueue patientQueue = new PatientQueue();
 			patientQueue.setPatient(patient);
@@ -271,6 +282,66 @@ public class CheckInResource {
 			log.warn("Error reading estimated wait minutes per person, using default: {}",
 			    PatientQueueingConfig.DEFAULT_ESTIMATED_WAIT_MINUTES_PER_PERSON, e);
 			return PatientQueueingConfig.DEFAULT_ESTIMATED_WAIT_MINUTES_PER_PERSON;
+		}
+	}
+	
+	/**
+	 * Ensure patient has a visit for check-in. If an active visit exists, reuse it. Otherwise,
+	 * create a new visit starting at the first second of the day.
+	 * 
+	 * @param patient the patient to check in
+	 * @param location the location for the visit
+	 * @return the existing or newly created visit, or null if visit type is not configured
+	 */
+	private Visit ensurePatientVisitForToday(Patient patient, Location location) {
+		try {
+			AdministrationService administrationService = Context.getAdministrationService();
+			String visitTypeUuid = administrationService.getGlobalProperty(
+			    PatientQueueingConfig.GP_SELF_CHECK_IN_VISIT_TYPE_UUID, "");
+			
+			// If no visit type is configured, skip visit creation
+			if (visitTypeUuid == null || visitTypeUuid.trim().isEmpty()) {
+				log.info("No visit type configured for check-in, skipping visit creation");
+				return null;
+			}
+			
+			VisitService visitService = Context.getVisitService();
+			
+			// Check for active visits - reuse the first active visit (regardless of when it started)
+			List<Visit> activeVisits = visitService.getActiveVisitsByPatient(patient);
+			if (activeVisits != null && !activeVisits.isEmpty()) {
+				Visit activeVisit = activeVisits.get(0);
+				log.info("Reusing existing active visit " + activeVisit.getUuid() + " for patient " + patient.getPatientId());
+				return activeVisit;
+			}
+			
+			// No active visit exists, create a new one
+			VisitType visitType = visitService.getVisitTypeByUuid(visitTypeUuid);
+			if (visitType == null) {
+				log.error("Configured visit type not found: " + visitTypeUuid);
+				return null;
+			}
+			
+			Visit visit = new Visit();
+			visit.setPatient(patient);
+			visit.setVisitType(visitType);
+			// Set visit start to beginning of day (00:00:00.000)
+			Calendar calendar = Calendar.getInstance();
+			calendar.set(Calendar.HOUR_OF_DAY, 0);
+			calendar.set(Calendar.MINUTE, 0);
+			calendar.set(Calendar.SECOND, 0);
+			calendar.set(Calendar.MILLISECOND, 0);
+			visit.setStartDatetime(calendar.getTime());
+			visit.setLocation(location);
+			
+			Visit savedVisit = visitService.saveVisit(visit);
+			log.info("Created new visit " + savedVisit.getUuid() + " of type " + visitType.getName() + " for patient "
+			        + patient.getPatientId());
+			return savedVisit;
+		}
+		catch (Exception e) {
+			log.error("Error ensuring patient visit for today: " + e.getMessage(), e);
+			return null;
 		}
 	}
 }
