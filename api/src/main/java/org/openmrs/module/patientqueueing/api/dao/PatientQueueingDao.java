@@ -25,7 +25,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Repository;
 
-import java.util.ArrayList;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.util.Date;
 import java.util.List;
 import java.util.Set;
@@ -494,29 +495,25 @@ public class PatientQueueingDao {
 	@SuppressWarnings("unchecked")
 	public java.util.Map<String, Integer> countPendingQueuesByLocation(List<Location> locations, Date fromDate, Date toDate) {
 		StringBuilder sb = new StringBuilder();
-		sb.append("SELECT pq.location_to_uuid, COUNT(pq.patient_queue_id) ");
-		sb.append("FROM patient_queue pq ");
-		sb.append("WHERE pq.date_created BETWEEN :fromDate AND :toDate ");
+		sb.append("SELECT pq.locationTo.uuid, COUNT(pq.patientQueueId) ");
+		sb.append("FROM patientqueueing.PatientQueue pq ");
+		sb.append("WHERE pq.dateCreated BETWEEN :fromDate AND :toDate ");
 		sb.append("AND pq.status = :status ");
-		sb.append("AND pq.voided = 0 ");
+		sb.append("AND pq.voided = false ");
 		
 		if (locations != null && !locations.isEmpty()) {
-			sb.append("AND pq.location_to_uuid IN (:locations) ");
+			sb.append("AND pq.locationTo IN (:locations) ");
 		}
 		
-		sb.append("GROUP BY pq.location_to_uuid");
+		sb.append("GROUP BY pq.locationTo.uuid");
 		
-		org.hibernate.Query query = getSession().createSQLQuery(sb.toString());
+		org.hibernate.Query query = getSession().createQuery(sb.toString());
 		query.setParameter("fromDate", fromDate);
 		query.setParameter("toDate", toDate);
-		query.setParameter("status", PatientQueue.Status.PENDING.name());
+		query.setParameter("status", PatientQueue.Status.PENDING);
 		
 		if (locations != null && !locations.isEmpty()) {
-			List<String> locationUuids = new ArrayList<String>();
-			for (Location location : locations) {
-				locationUuids.add(location.getUuid());
-			}
-			query.setParameterList("locations", locationUuids);
+			query.setParameterList("locations", locations);
 		}
 		
 		java.util.Map<String, Integer> result = new java.util.HashMap<String, Integer>();
@@ -534,7 +531,7 @@ public class PatientQueueingDao {
 	 * 
 	 * @param fromDate the start date
 	 * @param toDate the end date
-	 * @return list of unique patient IDs
+	 * @return set of unique patient IDs
 	 */
 	@SuppressWarnings("unchecked")
 	public Set<Integer> getUniquePatientIdsForToday(Date fromDate, Date toDate) {
@@ -547,7 +544,7 @@ public class PatientQueueingDao {
 		query.setParameter("toDate", toDate);
 		query.setMaxResults(10000); // Safety limit
 		
-		return new java.util.HashSet(query.list());
+		return new java.util.HashSet<Integer>((List<Integer>) query.list());
 	}
 	
 	/**
@@ -569,25 +566,126 @@ public class PatientQueueingDao {
 	}
 	
 	/**
-	 * Find a patient by person attribute value using an efficient database query.
+	 * Find a patient by person attribute value using direct SQL execution.
 	 * 
 	 * @param personAttributeTypeId the person attribute type ID
 	 * @param attributeValue the attribute value to match
 	 * @return the first matching patient, or null if not found
 	 */
-	@SuppressWarnings("unchecked")
-	public Patient getPatientByPersonAttributeValue(Integer personAttributeTypeId, String attributeValue) {
-		String hql = "SELECT p FROM Patient p " + "INNER JOIN p.person person " + "INNER JOIN person.attributes attr "
-		        + "WHERE attr.attributeType.personAttributeTypeId = :attributeTypeId " + "AND attr.value = :attributeValue "
-		        + "AND p.voided = false " + "AND person.voided = false " + "AND attr.voided = false";
+	public Patient getPatientByPersonAttributeValue(final Integer personAttributeTypeId, final String attributeValue) {
+		if (personAttributeTypeId == null) {
+			throw new IllegalArgumentException("personAttributeTypeId cannot be null");
+		}
+		if (attributeValue == null || attributeValue.trim().isEmpty()) {
+			throw new IllegalArgumentException("attributeValue cannot be null or empty");
+		}
 		
-		org.hibernate.Query query = getSession().createQuery(hql);
-		query.setParameter("attributeTypeId", personAttributeTypeId);
-		query.setParameter("attributeValue", attributeValue);
-		query.setMaxResults(1);
+		final String sql = "SELECT p.patient_id FROM person_attribute pa "
+		        + "INNER JOIN person_attribute_type pat ON pa.person_attribute_type_id = pat.person_attribute_type_id "
+		        + "INNER JOIN patient p ON pa.person_id = p.patient_id "
+		        + "WHERE pat.person_attribute_type_id = ? AND pa.value = ? " + "AND p.voided = 0 AND pa.voided = 0 LIMIT 1";
 		
-		List<Patient> results = query.list();
-		return results.isEmpty() ? null : results.get(0);
+		final Integer[] patientIdHolder = new Integer[1];
+		
+		try {
+			getSession().doWork(new org.hibernate.jdbc.Work() {
+				
+				@Override
+				public void execute(java.sql.Connection connection) throws java.sql.SQLException {
+					PreparedStatement ps = null;
+					try {
+						ps = connection.prepareStatement(sql);
+						ps.setInt(1, personAttributeTypeId);
+						ps.setString(2, attributeValue);
+						ResultSet rs = ps.executeQuery();
+						try {
+							if (rs.next()) {
+								int id = rs.getInt("patient_id");
+								if (!rs.wasNull()) {
+									patientIdHolder[0] = id;
+								}
+							}
+						}
+						finally {
+							rs.close();
+						}
+					}
+					finally {
+						if (ps != null) {
+							ps.close();
+						}
+					}
+				}
+			});
+		}
+		catch (Exception e) {
+			log.error("Error executing patient lookup query for attribute type: " + personAttributeTypeId, e);
+			return null;
+		}
+		
+		return patientIdHolder[0] != null ? (Patient) getSession().get(Patient.class, patientIdHolder[0]) : null;
+	}
+	
+	/**
+	 * Find a patient by person attribute value using attribute type UUID.
+	 * 
+	 * @param attributeTypeUuid the person attribute type UUID (more stable than numeric ID)
+	 * @param attributeValue the attribute value to match
+	 * @return the first matching patient, or null if not found
+	 */
+	public Patient getPatientByPersonAttributeValue(final String attributeTypeUuid, final String attributeValue) {
+		if (attributeTypeUuid == null) {
+			throw new IllegalArgumentException("attributeTypeUuid cannot be null");
+		}
+		if (attributeValue == null || attributeValue.trim().isEmpty()) {
+			throw new IllegalArgumentException("attributeValue cannot be null or empty");
+		}
+		
+		final String sql = "SELECT p.patient_id FROM person_attribute pa "
+		        + "INNER JOIN person_attribute_type pat ON pa.person_attribute_type_id = pat.person_attribute_type_id "
+		        + "INNER JOIN patient p ON pa.person_id = p.patient_id " + "WHERE pat.uuid = ? AND pa.value = ? "
+		        + "AND p.voided = 0 AND pa.voided = 0";
+		
+		final Integer[] patientIdHolder = new Integer[1];
+		
+		try {
+			getSession().doWork(new org.hibernate.jdbc.Work() {
+				
+				@Override
+				public void execute(java.sql.Connection connection) throws java.sql.SQLException {
+					PreparedStatement ps = null;
+					try {
+						ps = connection.prepareStatement(sql);
+						ps.setString(1, attributeTypeUuid);
+						ps.setString(2, attributeValue);
+						ps.setMaxRows(1);
+						ResultSet rs = ps.executeQuery();
+						try {
+							if (rs.next()) {
+								int id = rs.getInt("patient_id");
+								if (!rs.wasNull()) {
+									patientIdHolder[0] = id;
+								}
+							}
+						}
+						finally {
+							rs.close();
+						}
+					}
+					finally {
+						if (ps != null) {
+							ps.close();
+						}
+					}
+				}
+			});
+		}
+		catch (Exception e) {
+			log.error("Error executing patient lookup query for attribute type UUID: " + attributeTypeUuid, e);
+			return null;
+		}
+		
+		return patientIdHolder[0] != null ? (Patient) getSession().get(Patient.class, patientIdHolder[0]) : null;
 	}
 	
 }
