@@ -40,15 +40,15 @@ The **Patient Queueing Module** is an API-based OpenMRS module designed to facil
 
 ### Check-in APIs
 ```
-POST /ws/rest/v1/patientqueueing/checkin/checkInPatient     - Patient check-in
-POST /ws/rest/v1/patientqueueing/checkin/checkInNonPatient  - Non-patient check-in
+POST /ws/rest/v1/patientqueueing/checkin           - Generic patient check-in (configurable visit type)
+GET  /ws/rest/v1/patientqueueing/selfcheckin       - Self check-in for booth/kiosk (existing)
 ```
 
 ### Queue Display & Kiosk
 ```
-GET /ws/rest/v1/patientqueueing/kiosk              - Queue lookup by ticket
-GET /ws/rest/v1/patientqueueing/display            - Display data (now serving, up next)
-GET /ws/rest/v1/patientqueueing/display/statistics - Queue statistics
+GET  /ws/rest/v1/kiosk              - Queue lookup by ticket number
+GET  /ws/rest/v1/display            - Display data (now serving, up next)
+POST /ws/rest/v1/display/statistics - Queue statistics (if implemented)
 ```
 
 ### Non-Patient Queue Management
@@ -92,16 +92,17 @@ Configure global properties in OpenMRS (Advanced Settings → Patient Queueing):
 #### Patient Check-in
 ```bash
 curl -X POST \
-  'http://localhost:8080/openmrs/ws/rest/v1/patientqueueing/checkin/checkInPatient' \
+  'http://localhost:8080/openmrs/ws/rest/v1/patientqueueing/checkin' \
   -d 'patient=a9e39c4d-1234-5678-9abc-def456789012' \
-  -d 'location=b1e39c4d-1234-5678-9abc-def456789013' \
+  -d 'locationTo=b1e39c4d-1234-5678-9abc-def456789013' \
+  -d 'visitType=d1e39c4d-1234-5678-9abc-def456789015' \
   -d 'queueRoom=c1e39c4d-1234-5678-9abc-def456789014'
 ```
 
 #### Non-Patient Check-in
 ```bash
 curl -X POST \
-  'http://localhost:8080/openmrs/ws/rest/v1/patientqueueing/checkin/checkInNonPatient' \
+  'http://localhost:8080/openmrs/ws/rest/v1/patientqueueing/selfcheckin' \
   -d 'displayName=Jane Smith' \
   -d 'location=b1e39c4d-1234-5678-9abc-def456789013'
 ```
@@ -109,7 +110,7 @@ curl -X POST \
 #### Queue Display
 ```bash
 curl -X GET \
-  'http://localhost:8080/openmrs/ws/rest/v1/patientqueueing/display?location=b1e39c4d-1234-5678-9abc-def456789013'
+  'http://localhost:8080/openmrs/ws/rest/v1/display?location=b1e39c4d-1234-5678-9abc-def456789013'
 ```
 
 ---
@@ -189,8 +190,8 @@ The **Patient Queue UI Module** provides a user interface built on the OpenMRS A
 
 ## Requirements
 
-- OpenMRS 1.9.x - 2.x (or 3.x with compatibility layer)
-- Java 7 or higher
+- OpenMRS 2.8.x or higher (Platform 2.8.x)
+- Java 8 or higher
 - Maven 3.x
 
 ---
@@ -219,7 +220,7 @@ Run integration tests:
 mvn verify
 ```
 
-Current test coverage: **39 tests passing**
+Note: REST layer tests are currently disabled pending migration to REST 3.x testing patterns (see PatientQueueControllerTest).
 
 ---
 
@@ -240,9 +241,13 @@ If migrating from UgandaEMR's self check-in module:
 
 1. Configure queue type concepts in OpenMRS dictionary
 2. Set up provider assignment strategy global property
-3. Update client code to use new endpoints:
-   - `/ws/rest/v1/selfcheckinpatient` → `/ws/rest/v1/patientqueueing/checkin/checkInPatient`
-4. Test in staging environment
+3. Configure default visit type UUID (patientqueueing.defaultVisitTypeUuid)
+4. Update client code to use new endpoints:
+   - UgandaEMR: `/ws/rest/v1/selfcheckinpatient` 
+   - Generic: `/ws/rest/v1/patientqueueing/checkin`
+   - Booth/Kiosk: `/ws/rest/v1/patientqueueing/selfcheckin` (existing)
+5. Note parameter changes: `location` → `locationTo`, add `visitType` parameter
+6. Test in staging environment
 
 See [MIGRATION_PROGRESS.md](docs/MIGRATION_PROGRESS.md) for detailed migration guide.
 

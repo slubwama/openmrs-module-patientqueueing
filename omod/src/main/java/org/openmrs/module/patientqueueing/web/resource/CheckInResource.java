@@ -1,347 +1,420 @@
+/**
+ * This Source Code Form is subject to the terms of the Mozilla Public License,
+ * v. 2.0. If a copy of the MPL was not distributed with this file, You can
+ * obtain one at http://mozilla.org/MPL/2.0/. OpenMRS is also distributed under
+ * the terms of the Healthcare Disclaimer located at http://openmrs.org/license.
+ * <p>
+ * Copyright (C) OpenMRS Inc. OpenMRS is a registered trademark and the OpenMRS
+ * graphic logo is a trademark of OpenMRS Inc.
+ */
 package org.openmrs.module.patientqueueing.web.resource;
 
-import org.openmrs.Concept;
+import org.apache.commons.lang3.StringUtils;
 import org.openmrs.Location;
 import org.openmrs.Patient;
+import org.openmrs.Provider;
 import org.openmrs.Visit;
 import org.openmrs.VisitType;
 import org.openmrs.api.APIException;
 import org.openmrs.api.AdministrationService;
+import org.openmrs.api.LocationService;
+import org.openmrs.api.PatientService;
+import org.openmrs.api.ProviderService;
 import org.openmrs.api.VisitService;
 import org.openmrs.api.context.Context;
+import org.openmrs.module.patientqueueing.model.PatientQueue;
 import org.openmrs.module.patientqueueing.PatientQueueingConfig;
 import org.openmrs.module.patientqueueing.api.PatientQueueingService;
+import org.openmrs.module.patientqueueing.api.ProviderAssignmentService;
 import org.openmrs.module.patientqueueing.web.customdto.CheckInResult;
 import org.openmrs.module.patientqueueing.web.customdto.QueueEntry;
-import org.openmrs.module.patientqueueing.model.NonPatientQueue;
-import org.openmrs.module.patientqueueing.model.PatientQueue;
 import org.openmrs.module.webservices.rest.web.RequestContext;
 import org.openmrs.module.webservices.rest.web.RestConstants;
 import org.openmrs.module.webservices.rest.web.annotation.Resource;
-import org.openmrs.util.OpenmrsUtil;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.openmrs.module.webservices.rest.web.resource.api.PageableResult;
+import org.openmrs.module.webservices.rest.web.resource.impl.DelegatingCrudResource;
+import org.openmrs.module.webservices.rest.web.response.ResourceDoesNotSupportOperationException;
+import org.openmrs.module.webservices.rest.web.representation.DefaultRepresentation;
+import org.openmrs.module.webservices.rest.web.representation.FullRepresentation;
+import org.openmrs.module.webservices.rest.web.representation.Representation;
+import org.openmrs.module.webservices.rest.web.resource.impl.NeedsPaging;
+import org.openmrs.module.webservices.rest.web.resource.impl.DelegatingResourceDescription;
+import org.openmrs.module.webservices.rest.web.response.ResponseException;
+import org.openmrs.module.webservices.rest.SimpleObject;
 
+import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
-import java.util.UUID;
 
 /**
- * REST resource for self check-in Handles both patient and non-patient check-ins
+ * REST resource for generic patient check-in with configurable visit type. Supports provider
+ * auto-assignment, queue position calculation, and estimated wait time.
  */
 @Resource(name = RestConstants.VERSION_1 + "/patientqueueing/checkin", supportedClass = CheckInResult.class, supportedOpenmrsVersions = { "1.9.* - 9.*" })
-public class CheckInResource {
+public class CheckInResource extends DelegatingCrudResource<CheckInResult> {
 	
-	private static final Logger log = LoggerFactory.getLogger(CheckInResource.class);
+	@Override
+	public CheckInResult newDelegate() {
+		return new CheckInResult();
+	}
 	
-	/**
-	 * Perform self check-in for a patient
-	 * 
-	 * @param context the request context
-	 * @return CheckInResult with visit, queue entry, and ticket information
-	 */
-	public CheckInResult checkInPatient(RequestContext context) {
-		PatientQueueingService service = Context.getService(PatientQueueingService.class);
+	@Override
+	public CheckInResult save(CheckInResult delegate) {
+		// CREATE is handled via create() method with SimpleObject
+		throw new ResourceDoesNotSupportOperationException("SAVE not supported");
+	}
+	
+	@Override
+	public CheckInResult getByUniqueId(String uniqueId) {
+		throw new ResourceDoesNotSupportOperationException("GET by UUID not supported");
+	}
+	
+	@Override
+	protected PageableResult doSearch(RequestContext context) throws ResponseException {
+		throw new ResourceDoesNotSupportOperationException("SEARCH not supported");
+	}
+	
+	@Override
+	public CheckInResult create(SimpleObject propertiesToCreate, RequestContext context) throws ResponseException {
+		PatientService patientService = Context.getPatientService();
+		LocationService locationService = Context.getLocationService();
+		ProviderService providerService = Context.getProviderService();
+		VisitService visitService = Context.getVisitService();
+		AdministrationService adminService = Context.getAdministrationService();
+		PatientQueueingService queueingService = Context.getService(PatientQueueingService.class);
+		ProviderAssignmentService providerAssignmentService = Context.getService(ProviderAssignmentService.class);
 		
-		// Get parameters
-		String patientUuid = context.getParameter("patient");
-		String locationUuid = context.getParameter("location");
-		String queueRoomUuid = context.getParameter("queueRoom");
+		// Extract required properties with backward compatibility
+		String patientUuid = getRequiredProperty(propertiesToCreate, "patient");
 		
-		// Validate required parameters
-		if (patientUuid == null || patientUuid.isEmpty()) {
-			return new CheckInResult("patient parameter is required");
+		// Support both "locationTo" (new) and "location" (backward compatibility)
+		String locationToUuid = propertiesToCreate.get("locationTo");
+		if (locationToUuid == null) {
+			locationToUuid = propertiesToCreate.get("location");
+		}
+		if (locationToUuid == null) {
+			throw new IllegalArgumentException("locationTo (or location) is required");
 		}
 		
-		if (locationUuid == null || locationUuid.isEmpty()) {
-			return new CheckInResult("location parameter is required");
-		}
+		// Extract optional properties
+		String visitTypeUuid = propertiesToCreate.get("visitType");
+		String queueRoomUuid = propertiesToCreate.get("queueRoom");
+		String providerUuid = propertiesToCreate.get("provider");
+		Integer priority = getIntegerProperty(propertiesToCreate, "priority");
+		String comment = propertiesToCreate.get("comment");
+		Boolean autoAssignProvider = getBooleanProperty(propertiesToCreate, "autoAssignProvider", null);
 		
-		// Get patient
-		Patient patient = Context.getPatientService().getPatientByUuid(patientUuid);
-		if (patient == null) {
-			return new CheckInResult("Patient not found");
-		}
+		// Retrieve and validate entities
+		Patient patient = patientService.getPatientByUuid(patientUuid);
+		validateNotNull(patient, "Patient not found for UUID: " + patientUuid);
 		
-		// Get location
-		Location location = Context.getLocationService().getLocationByUuid(locationUuid);
-		if (location == null) {
-			return new CheckInResult("Location not found");
-		}
+		Location locationTo = locationService.getLocationByUuid(locationToUuid);
+		validateNotNull(locationTo, "Location not found for UUID: " + locationToUuid);
 		
-		// Get queue room (optional)
 		Location queueRoom = null;
-		if (queueRoomUuid != null && !queueRoomUuid.isEmpty()) {
-			queueRoom = Context.getLocationService().getLocationByUuid(queueRoomUuid);
-			if (queueRoom == null) {
-				return new CheckInResult("Queue room not found");
-			}
+		if (StringUtils.isNotBlank(queueRoomUuid)) {
+			queueRoom = locationService.getLocationByUuid(queueRoomUuid);
 		}
 		
-		try {
-			// Ensure patient has a visit for today (create or reuse existing)
-			Visit visit = ensurePatientVisitForToday(patient, location);
-			if (visit == null) {
-				log.warn("Could not create or find visit for patient " + patient.getPatientId()
-				        + ". Proceeding with queue entry only.");
-			}
-			
-			// Create patient queue entry
-			PatientQueue patientQueue = new PatientQueue();
-			patientQueue.setPatient(patient);
-			patientQueue.setLocationTo(location);
-			patientQueue.setQueueRoom(queueRoom);
-			patientQueue.setStatus(PatientQueue.Status.PENDING);
-			patientQueue.setDateCreated(new Date());
-			
-			// Generate visit number (ticket number)
-			String visitNumber = service.generateVisitNumber(location, patient);
-			patientQueue.setVisitNumber(visitNumber);
-			
-			// Save the queue entry
-			patientQueue = service.savePatientQue(patientQueue);
-			
-			// Calculate queue position
-			int queuePosition = calculatePatientQueuePosition(service, location, queueRoom);
-			
-			// Calculate estimated wait time (configured minutes per person ahead)
-			int estimatedWaitMinutes = queuePosition * getEstimatedWaitMinutesPerPerson();
-			
-			// Create result
-			CheckInResult result = new CheckInResult();
-			result.setPatient(patient);
-			result.setQueueEntry(new QueueEntry(patientQueue));
-			result.setTicketNumber(patientQueue.getVisitNumber());
-			result.setQueuePosition(queuePosition);
-			result.setEstimatedWaitMinutes(estimatedWaitMinutes);
-			result.setSuccess(true);
-			
-			return result;
+		Provider provider = null;
+		if (StringUtils.isNotBlank(providerUuid)) {
+			provider = providerService.getProviderByUuid(providerUuid);
 		}
-		catch (APIException e) {
-			return new CheckInResult("Check-in failed: " + e.getMessage());
+		
+		// Determine visit type - use provided or default from configuration
+		VisitType visitType = getVisitType(visitService, adminService, visitTypeUuid);
+		validateNotNull(visitType, "VisitType not found - configure patientqueueing.defaultVisitTypeUuid global property");
+		
+		// Create or reuse visit with null check for error handling
+		Visit visit = ensureVisitForPatient(visitService, patient, locationTo, visitType);
+		if (visit == null) {
+			throw new APIException("Failed to create visit for patient - please check visit configuration");
 		}
-		catch (Exception e) {
-			return new CheckInResult("Check-in failed: " + e.getMessage());
+		
+		// Create patient queue entry
+		PatientQueue patientQueue = new PatientQueue();
+		patientQueue.setPatient(patient);
+		patientQueue.setLocationTo(locationTo);
+		patientQueue.setQueueRoom(queueRoom);
+		patientQueue.setStatus(PatientQueue.Status.PENDING);
+		patientQueue.setDateCreated(new Date());
+		patientQueue.setPriority(priority);
+		patientQueue.setComment(comment);
+		
+		// Generate visit number (ticket number)
+		String visitNumber = queueingService.generateVisitNumber(locationTo, patient);
+		patientQueue.setVisitNumber(visitNumber);
+		
+		// Auto-assign provider if requested and no provider specified
+		if (provider == null && shouldAutoAssignProvider(adminService, autoAssignProvider)) {
+			provider = providerAssignmentService.assignProvider(locationTo);
 		}
+		
+		if (provider != null) {
+			patientQueue.setProvider(provider);
+		}
+		
+		// Save the queue entry
+		patientQueue = queueingService.savePatientQue(patientQueue);
+		
+		// Calculate queue position
+		int queuePosition = calculateQueuePosition(queueingService, locationTo, queueRoom);
+		
+		// Calculate estimated wait time
+		int estimatedWaitMinutes = calculateEstimatedWait(queuePosition, adminService);
+		
+		// Build and return result
+		CheckInResult result = new CheckInResult();
+		result.setPatient(patient);
+		result.setVisit(visit);
+		result.setQueueEntry(new QueueEntry(patientQueue));
+		result.setTicketNumber(patientQueue.getVisitNumber());
+		result.setQueuePosition(queuePosition);
+		result.setEstimatedWaitMinutes(estimatedWaitMinutes);
+		result.setSuccess(true);
+		
+		return result;
 	}
 	
 	/**
-	 * Perform self check-in for a non-patient
+	 * Ensures the patient has an active visit. Reuses existing active visit or creates a new one.
 	 * 
-	 * @param context the request context
-	 * @return CheckInResult with queue entry and ticket information
+	 * @param visitService The visit service
+	 * @param patient The patient
+	 * @param location The location
+	 * @param visitType The visit type
+	 * @return The visit (existing or newly created)
 	 */
-	public CheckInResult checkInNonPatient(RequestContext context) {
-		PatientQueueingService service = Context.getService(PatientQueueingService.class);
-		
-		// Get parameters
-		String displayName = context.getParameter("displayName");
-		String phoneNumber = context.getParameter("phoneNumber");
-		String queueTypeUuid = context.getParameter("queueType");
-		String locationUuid = context.getParameter("location");
-		String queueRoomUuid = context.getParameter("queueRoom");
-		
-		// Validate required parameters
-		if (displayName == null || displayName.isEmpty()) {
-			return new CheckInResult("displayName parameter is required");
-		}
-		
-		if (locationUuid == null || locationUuid.isEmpty()) {
-			return new CheckInResult("location parameter is required");
-		}
-		
-		// Get location
-		Location location = Context.getLocationService().getLocationByUuid(locationUuid);
-		if (location == null) {
-			return new CheckInResult("Location not found");
-		}
-		
-		// Get queue room (optional)
-		Location queueRoom = null;
-		if (queueRoomUuid != null && !queueRoomUuid.isEmpty()) {
-			queueRoom = Context.getLocationService().getLocationByUuid(queueRoomUuid);
-			if (queueRoom == null) {
-				return new CheckInResult("Queue room not found");
-			}
-		}
-		
-		// Get queue type (optional)
-		Concept queueType = null;
-		if (queueTypeUuid != null && !queueTypeUuid.isEmpty()) {
-			queueType = Context.getConceptService().getConceptByUuid(queueTypeUuid);
-			if (queueType == null) {
-				return new CheckInResult("Queue type concept not found");
-			}
-		}
-		
+	private Visit ensureVisitForPatient(VisitService visitService, Patient patient, Location location, VisitType visitType) {
 		try {
-			// Generate ticket number
-			String ticketNumber = service.generateNonPatientQueueTicketNumber(location, queueType);
-			
-			// Create non-patient queue entry
-			NonPatientQueue nonPatientQueue = new NonPatientQueue();
-			nonPatientQueue.setUuid(UUID.randomUUID().toString());
-			nonPatientQueue.setDisplayName(displayName);
-			nonPatientQueue.setPhoneNumber(phoneNumber);
-			nonPatientQueue.setQueueType(queueType);
-			nonPatientQueue.setCurrentLocation(location);
-			nonPatientQueue.setLocationTo(location);
-			nonPatientQueue.setQueueRoom(queueRoom);
-			nonPatientQueue.setStatus(NonPatientQueue.NonPatientQueueStatus.WAITING);
-			nonPatientQueue.setTicketNumber(ticketNumber);
-			nonPatientQueue.setDateCreated(new Date());
-			
-			// Save the queue entry
-			nonPatientQueue = service.saveNonPatientQueue(nonPatientQueue);
-			
-			// Calculate queue position
-			int queuePosition = calculateNonPatientQueuePosition(service, location, queueRoom);
-			
-			// Calculate estimated wait time (configured minutes per person ahead)
-			int estimatedWaitMinutes = queuePosition * getEstimatedWaitMinutesPerPerson();
-			
-			// Create result
-			CheckInResult result = new CheckInResult();
-			result.setQueueEntry(new QueueEntry(nonPatientQueue));
-			result.setTicketNumber(nonPatientQueue.getTicketNumber());
-			result.setQueuePosition(queuePosition);
-			result.setEstimatedWaitMinutes(estimatedWaitMinutes);
-			result.setSuccess(true);
-			
-			return result;
-		}
-		catch (APIException e) {
-			return new CheckInResult("Check-in failed: " + e.getMessage());
-		}
-		catch (Exception e) {
-			return new CheckInResult("Check-in failed: " + e.getMessage());
-		}
-	}
-	
-	/**
-	 * Calculate queue position for patient
-	 */
-	private int calculatePatientQueuePosition(PatientQueueingService service, Location location, Location queueRoom) {
-		Date today = new Date();
-		Date fromDate = OpenmrsUtil.firstSecondOfDay(today);
-		Date toDate = OpenmrsUtil.getLastMomentOfDay(today);
-		
-		List<PatientQueue> queues = service.getPatientQueueList(null, fromDate, toDate, null, null, null,
-		    PatientQueue.Status.PENDING, queueRoom);
-		
-		int position = 0;
-		for (PatientQueue q : queues) {
-			if (location.equals(q.getLocationTo()) || location.equals(q.getQueueRoom())) {
-				position++;
-			}
-		}
-		
-		return position + 1;
-	}
-	
-	/**
-	 * Calculate queue position for non-patient
-	 */
-	private int calculateNonPatientQueuePosition(PatientQueueingService service, Location location, Location queueRoom) {
-		Date today = new Date();
-		Date fromDate = OpenmrsUtil.firstSecondOfDay(today);
-		Date toDate = OpenmrsUtil.getLastMomentOfDay(today);
-		
-		List<NonPatientQueue> queues = service.getNonPatientQueues(NonPatientQueue.NonPatientQueueStatus.WAITING, null,
-		    location, queueRoom, fromDate, toDate);
-		
-		return queues.size();
-	}
-	
-	/**
-	 * Get the estimated wait minutes per person from global property.
-	 * 
-	 * @return the configured minutes per person, default 5 if not configured or invalid
-	 */
-	private int getEstimatedWaitMinutesPerPerson() {
-		try {
-			AdministrationService adminService = Context.getAdministrationService();
-			String value = adminService.getGlobalProperty(PatientQueueingConfig.GP_ESTIMATED_WAIT_MINUTES_PER_PERSON,
-			    String.valueOf(PatientQueueingConfig.DEFAULT_ESTIMATED_WAIT_MINUTES_PER_PERSON));
-			int minutes = Integer.parseInt(value);
-			if (minutes <= 0) {
-				log.warn("Invalid estimated wait minutes per person: {}, using default: {}", minutes,
-				    PatientQueueingConfig.DEFAULT_ESTIMATED_WAIT_MINUTES_PER_PERSON);
-				return PatientQueueingConfig.DEFAULT_ESTIMATED_WAIT_MINUTES_PER_PERSON;
-			}
-			return minutes;
-		}
-		catch (NumberFormatException e) {
-			log.warn("Invalid estimated wait minutes per person format, using default: {}",
-			    PatientQueueingConfig.DEFAULT_ESTIMATED_WAIT_MINUTES_PER_PERSON, e);
-			return PatientQueueingConfig.DEFAULT_ESTIMATED_WAIT_MINUTES_PER_PERSON;
-		}
-		catch (Exception e) {
-			log.warn("Error reading estimated wait minutes per person, using default: {}",
-			    PatientQueueingConfig.DEFAULT_ESTIMATED_WAIT_MINUTES_PER_PERSON, e);
-			return PatientQueueingConfig.DEFAULT_ESTIMATED_WAIT_MINUTES_PER_PERSON;
-		}
-	}
-	
-	/**
-	 * Ensure patient has a visit for check-in. If an active visit exists, reuse it. Otherwise,
-	 * create a new visit starting at the first second of the day.
-	 * 
-	 * @param patient the patient to check in
-	 * @param location the location for the visit
-	 * @return the existing or newly created visit, or null if visit type is not configured
-	 */
-	private Visit ensurePatientVisitForToday(Patient patient, Location location) {
-		try {
-			AdministrationService administrationService = Context.getAdministrationService();
-			String visitTypeUuid = administrationService.getGlobalProperty(
-			    PatientQueueingConfig.GP_SELF_CHECK_IN_VISIT_TYPE_UUID, "");
-			
-			// If no visit type is configured, skip visit creation
-			if (visitTypeUuid == null || visitTypeUuid.trim().isEmpty()) {
-				log.info("No visit type configured for check-in, skipping visit creation");
-				return null;
-			}
-			
-			VisitService visitService = Context.getVisitService();
-			
-			// Check for active visits - reuse the first active visit (regardless of when it started)
+			// Check for active visits
 			List<Visit> activeVisits = visitService.getActiveVisitsByPatient(patient);
 			if (activeVisits != null && !activeVisits.isEmpty()) {
-				Visit activeVisit = activeVisits.get(0);
-				log.info("Reusing existing active visit " + activeVisit.getUuid() + " for patient " + patient.getPatientId());
-				return activeVisit;
+				// Reuse first active visit
+				return activeVisits.get(0);
 			}
 			
-			// No active visit exists, create a new one
-			VisitType visitType = visitService.getVisitTypeByUuid(visitTypeUuid);
-			if (visitType == null) {
-				log.error("Configured visit type not found: " + visitTypeUuid);
-				return null;
-			}
-			
+			// Create new visit starting at beginning of today
 			Visit visit = new Visit();
 			visit.setPatient(patient);
 			visit.setVisitType(visitType);
-			// Set visit start to beginning of day (00:00:00.000)
+			visit.setLocation(location);
+			
+			// Set start time to beginning of day
 			Calendar calendar = Calendar.getInstance();
 			calendar.set(Calendar.HOUR_OF_DAY, 0);
 			calendar.set(Calendar.MINUTE, 0);
 			calendar.set(Calendar.SECOND, 0);
 			calendar.set(Calendar.MILLISECOND, 0);
 			visit.setStartDatetime(calendar.getTime());
-			visit.setLocation(location);
 			
-			Visit savedVisit = visitService.saveVisit(visit);
-			log.info("Created new visit " + savedVisit.getUuid() + " of type " + visitType.getName() + " for patient "
-			        + patient.getPatientId());
-			return savedVisit;
+			Visit saved = visitService.saveVisit(visit);
+			return saved;
 		}
 		catch (Exception e) {
-			log.error("Error ensuring patient visit for today: " + e.getMessage(), e);
+			throw new APIException("Failed to create visit for patient: " + e.getMessage(), e);
+		}
+	}
+	
+	/**
+	 * Gets the visit type to use for the check-in. Uses provided UUID or default from
+	 * configuration.
+	 * 
+	 * @param visitService The visit service
+	 * @param adminService The administration service
+	 * @param visitTypeUuid The provided visit type UUID (may be null)
+	 * @return The visit type
+	 */
+	private VisitType getVisitType(VisitService visitService, AdministrationService adminService, String visitTypeUuid) {
+		VisitType visitType = null;
+		
+		// Use provided visit type if available
+		if (StringUtils.isNotBlank(visitTypeUuid)) {
+			visitType = visitService.getVisitTypeByUuid(visitTypeUuid);
+		}
+		
+		// Fall back to default from configuration
+		if (visitType == null) {
+			String defaultVisitTypeUuid = adminService.getGlobalProperty(PatientQueueingConfig.GP_DEFAULT_VISIT_TYPE);
+			if (StringUtils.isNotBlank(defaultVisitTypeUuid)) {
+				visitType = visitService.getVisitTypeByUuid(defaultVisitTypeUuid);
+			}
+		}
+		
+		return visitType;
+	}
+	
+	/**
+	 * Determines if provider should be auto-assigned based on configuration and request.
+	 * 
+	 * @param adminService The administration service
+	 * @param autoAssignProvider Override value from request (null = use default)
+	 * @return true if provider should be auto-assigned
+	 */
+	private Boolean shouldAutoAssignProvider(AdministrationService adminService, Boolean autoAssignProvider) {
+		// Use override if provided
+		if (autoAssignProvider != null) {
+			return autoAssignProvider;
+		}
+		
+		// Use default from configuration
+		String defaultValue = adminService.getGlobalProperty(PatientQueueingConfig.GP_AUTO_ASSIGN_PROVIDER,
+		    String.valueOf(PatientQueueingConfig.DEFAULT_AUTO_ASSIGN_PROVIDER));
+		return Boolean.parseBoolean(defaultValue);
+	}
+	
+	/**
+	 * Calculates the patient's position in the queue for the given location and room.
+	 * 
+	 * @param queueingService The queueing service
+	 * @param location The location
+	 * @param queueRoom The queue room (may be null)
+	 * @return The queue position (1-indexed)
+	 */
+	private int calculateQueuePosition(PatientQueueingService queueingService, Location location, Location queueRoom) {
+		Date today = new Date();
+		Date startOfDay = org.openmrs.util.OpenmrsUtil.firstSecondOfDay(today);
+		Date endOfDay = org.openmrs.util.OpenmrsUtil.getLastMomentOfDay(today);
+		
+		List<PatientQueue> pendingQueues = queueingService.getPatientQueueList(null, startOfDay, endOfDay, location, null,
+		    null, PatientQueue.Status.PENDING, queueRoom);
+		
+		// Position is count of people ahead + 1 for current patient
+		return pendingQueues.size() + 1;
+	}
+	
+	/**
+	 * Calculates estimated wait time based on queue position.
+	 * 
+	 * @param queuePosition The patient's position in queue
+	 * @param adminService The administration service
+	 * @return Estimated wait time in minutes
+	 */
+	private int calculateEstimatedWait(int queuePosition, AdministrationService adminService) {
+		// Get configured minutes per person ahead
+		String minutesPerPersonStr = adminService.getGlobalProperty(
+		    PatientQueueingConfig.GP_ESTIMATED_WAIT_MINUTES_PER_PERSON,
+		    String.valueOf(PatientQueueingConfig.DEFAULT_ESTIMATED_WAIT_MINUTES_PER_PERSON));
+		
+		try {
+			int minutesPerPerson = Integer.parseInt(minutesPerPersonStr);
+			// Wait time = (people ahead) * minutes per person
+			return (queuePosition - 1) * minutesPerPerson;
+		}
+		catch (NumberFormatException e) {
+			return PatientQueueingConfig.DEFAULT_ESTIMATED_WAIT_MINUTES_PER_PERSON * (queuePosition - 1);
+		}
+	}
+	
+	@Override
+	public Object update(String uuid, SimpleObject propertiesToUpdate, RequestContext context) throws ResponseException {
+		throw new ResourceDoesNotSupportOperationException("UPDATE not supported");
+	}
+	
+	@Override
+	protected void delete(CheckInResult delegate, String s, RequestContext requestContext) throws ResponseException {
+		throw new ResourceDoesNotSupportOperationException("DELETE not supported");
+	}
+	
+	@Override
+	public void purge(CheckInResult delegate, RequestContext requestContext) throws ResponseException {
+		throw new ResourceDoesNotSupportOperationException("PURGE not supported");
+	}
+	
+	@Override
+	public List<Representation> getAvailableRepresentations() {
+		return Arrays.asList(Representation.DEFAULT, Representation.FULL);
+	}
+	
+	@Override
+	public DelegatingResourceDescription getRepresentationDescription(Representation rep) {
+		if (rep instanceof DefaultRepresentation) {
+			DelegatingResourceDescription description = new DelegatingResourceDescription();
+			description.addProperty("patient");
+			description.addProperty("visit");
+			description.addProperty("queueEntry");
+			description.addProperty("ticketNumber");
+			description.addProperty("queuePosition");
+			description.addProperty("estimatedWaitMinutes");
+			description.addProperty("success");
+			description.addProperty("errorMessage");
+			description.addSelfLink();
+			return description;
+		} else if (rep instanceof FullRepresentation) {
+			DelegatingResourceDescription description = new DelegatingResourceDescription();
+			description.addProperty("patient", Representation.FULL);
+			description.addProperty("visit", Representation.FULL);
+			description.addProperty("queueEntry", Representation.FULL);
+			description.addProperty("ticketNumber");
+			description.addProperty("queuePosition");
+			description.addProperty("estimatedWaitMinutes");
+			description.addProperty("success");
+			description.addProperty("errorMessage");
+			description.addSelfLink();
+			return description;
+		}
+		return null;
+	}
+	
+	@Override
+	public DelegatingResourceDescription getCreatableProperties() {
+		DelegatingResourceDescription description = new DelegatingResourceDescription();
+		description.addProperty("patient");
+		description.addProperty("locationTo");
+		description.addProperty("visitType");
+		description.addProperty("queueRoom");
+		description.addProperty("provider");
+		description.addProperty("priority");
+		description.addProperty("comment");
+		description.addProperty("autoAssignProvider");
+		return description;
+	}
+	
+	/**
+	 * Helper method to retrieve a required property.
+	 */
+	private String getRequiredProperty(SimpleObject properties, String key) {
+		String value = properties.get(key);
+		if (value == null) {
+			throw new IllegalArgumentException(key + " is required");
+		}
+		return value;
+	}
+	
+	/**
+	 * Helper method to get an integer property.
+	 */
+	private Integer getIntegerProperty(SimpleObject properties, String key) {
+		Object value = properties.get(key);
+		if (value == null) {
 			return null;
+		}
+		try {
+			return Integer.parseInt(value.toString());
+		}
+		catch (NumberFormatException e) {
+			throw new IllegalArgumentException(key + " must be a valid integer");
+		}
+	}
+	
+	/**
+	 * Helper method to get a boolean property.
+	 */
+	private Boolean getBooleanProperty(SimpleObject properties, String key, Boolean defaultValue) {
+		Object value = properties.get(key);
+		if (value == null) {
+			return defaultValue;
+		}
+		return Boolean.parseBoolean(value.toString());
+	}
+	
+	/**
+	 * Helper method to validate that an object is not null.
+	 */
+	private void validateNotNull(Object obj, String errorMessage) {
+		if (obj == null) {
+			throw new IllegalArgumentException(errorMessage);
 		}
 	}
 }

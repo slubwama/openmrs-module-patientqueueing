@@ -44,7 +44,7 @@ import java.util.List;
  * in body) Supports operations: - Update queue status and priority - Forward patients between
  * locations - Unified patient and non-patient queue management
  */
-@Resource(name = RestConstants.VERSION_1 + "/providerqueuebylocation", supportedClass = ProviderQueueEntry.class, supportedOpenmrsVersions = { "1.8 - 9.0.*" })
+@Resource(name = RestConstants.VERSION_1 + "/patientqueueing/providerqueuebylocation", supportedClass = ProviderQueueEntry.class, supportedOpenmrsVersions = { "1.8 - 9.0.*" })
 public class ProviderQueueResource extends DelegatingCrudResource<ProviderQueueEntry> {
 	
 	private PatientQueueingService patientQueueingService() {
@@ -186,7 +186,8 @@ public class ProviderQueueResource extends DelegatingCrudResource<ProviderQueueE
 			}
 		}
 		
-		List<NonPatientQueue> nonPatientQueues = patientQueueingService().getNonPatientQueues(null, null, queueRoom, null,
+		List<NonPatientQueue> nonPatientQueues = patientQueueingService().getNonPatientQueues(null, null, null, queueRoom,
+		// Fixed: queueRoom is 4th param (was incorrectly 3rd), locationTo is 3rd param (null here)
 		    from, to);
 		
 		if (nonPatientQueues != null) {

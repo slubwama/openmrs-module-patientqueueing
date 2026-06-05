@@ -254,7 +254,7 @@ public class PatientQueueResource extends DelegatingCrudResource<PatientQueue> {
 		}
 		
 		// Filter out COMPLETED entries unless includeHistory is true
-		if (!includeHistory && PatientQueuesByQuery != null) {
+		if (!includeHistory && PatientQueuesByQuery != null && queueStatus != PatientQueue.Status.COMPLETED) {
 			List<PatientQueue> filtered = new java.util.ArrayList<PatientQueue>();
 			for (PatientQueue queue : PatientQueuesByQuery) {
 				if (queue.getStatus() != PatientQueue.Status.COMPLETED) {

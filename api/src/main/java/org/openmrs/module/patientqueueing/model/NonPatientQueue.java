@@ -239,25 +239,38 @@ public class NonPatientQueue extends BaseOpenmrsData implements Serializable {
 	
 	@Override
 	public boolean equals(Object obj) {
-		if (obj instanceof NonPatientQueue) {
-			NonPatientQueue q = (NonPatientQueue) obj;
-			if (this.getNonPatientQueueId() != null && q.getNonPatientQueueId() != null) {
-				return this.getNonPatientQueueId().equals(q.getNonPatientQueueId());
-			}
-			return java.util.Objects.equals(this.getUuid(), q.getUuid());
+		if (this == obj) {
+			return true;
 		}
+		if (obj == null || getClass() != obj.getClass()) {
+			return false;
+		}
+		NonPatientQueue other = (NonPatientQueue) obj;
+		
+		// Use UUID for equality as it's assigned before persistence and is consistent
+		// Fall back to ID only for backward compatibility with legacy data
+		if (getUuid() != null && other.getUuid() != null) {
+			return getUuid().equals(other.getUuid());
+		}
+		if (getNonPatientQueueId() != null && other.getNonPatientQueueId() != null) {
+			return getNonPatientQueueId().equals(other.getNonPatientQueueId());
+		}
+		// Both UUID and ID are null for new unsaved objects - can't determine equality
 		return false;
 	}
 	
 	@Override
 	public int hashCode() {
-		if (getNonPatientQueueId() != null) {
-			return getNonPatientQueueId().hashCode();
-		}
+		// Must match equals logic: UUID first, then ID
 		if (getUuid() != null) {
 			return getUuid().hashCode();
 		}
-		return super.hashCode();
+		if (getNonPatientQueueId() != null) {
+			return getNonPatientQueueId().hashCode();
+		}
+		// New unsaved object - use constant hash code
+		// equals() returns false for two new instances, so this is acceptable
+		return 0;
 	}
 	
 	/**

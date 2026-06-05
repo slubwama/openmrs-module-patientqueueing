@@ -1,6 +1,6 @@
 # Patient Queueing Module - REST API Documentation
 
-**Version**: 2.0.2-SNAPSHOT
+**Version**: 3.0.*
 **Base Path**: `/ws/rest/v1`
 
 ---
@@ -17,18 +17,23 @@
 
 ## Check-in APIs
 
-### Patient Check-in
+### Generic Check-in
 
-Check in a patient and generate a queue ticket.
+Generic patient check-in with configurable visit type. Supports provider auto-assignment, queue position calculation, and estimated wait time.
 
-**Endpoint**: `POST /ws/rest/v1/patientqueueing/checkin/checkInPatient`
+**Endpoint**: `POST /ws/rest/v1/patientqueueing/checkin`
 
 **Parameters**:
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | patient | string | Yes | Patient UUID |
-| location | string | Yes | Location UUID (destination) |
+| locationTo | string | Yes | Destination Location UUID |
+| visitType | string | No | Visit type UUID (overrides default) |
 | queueRoom | string | No | Queue room UUID |
+| provider | string | No | Provider UUID (skips auto-assignment) |
+| priority | int | No | Priority level |
+| comment | string | No | Comment for the queue entry |
+| autoAssignProvider | boolean | No | Override auto-assignment setting |
 
 **Response**: `CheckInResult`
 ```json
@@ -68,26 +73,28 @@ Check in a patient and generate a queue ticket.
 **Example**:
 ```bash
 curl -X POST \
-  'http://localhost:8080/openmrs/ws/rest/v1/patientqueueing/checkin/checkInPatient' \
+  'http://localhost:8080/openmrs/ws/rest/v1/patientqueueing/checkin' \
   -d 'patient=a9e39c4d-1234-5678-9abc-def456789012' \
-  -d 'location=b1e39c4d-1234-5678-9abc-def456789013' \
+  -d 'locationTo=b1e39c4d-1234-5678-9abc-def456789013' \
+  -d 'visitType=d1e39c4d-1234-5678-9abc-def456789015' \
   -d 'queueRoom=c1e39c4d-1234-5678-9abc-def456789014'
 ```
 
-### Non-Patient Check-in
+### Self Check-in (Booth/Kiosk)
 
-Check in a non-patient (walk-in) and generate a queue ticket.
+Self check-in endpoint for booth/kiosk scenarios. Simplified interface for self-service check-in.
 
-**Endpoint**: `POST /ws/rest/v1/patientqueueing/checkin/checkInNonPatient`
+**Endpoint**: `GET /ws/rest/v1/patientqueueing/selfcheckin`
 
-**Parameters**:
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| displayName | string | Yes | Display name for the visitor |
-| phoneNumber | string | No | Contact phone number |
-| queueType | string | No | Queue type Concept UUID |
-| location | string | Yes | Location UUID (destination) |
-| queueRoom | string | No | Queue room UUID |
+**Example**:
+```bash
+curl -X POST \
+  'http://localhost:8080/openmrs/ws/rest/v1/patientqueueing/selfcheckin' \
+  -d 'displayName=Jane Smith' \
+  -d 'phoneNumber=+1234567890' \
+  -d 'location=b1e39c4d-1234-5678-9abc-def456789013' \
+  -d 'queueRoom=c1e39c4d-1234-5678-9abc-def456789014'
+```
 
 **Response**: `CheckInResult`
 ```json
@@ -121,13 +128,21 @@ Check in a non-patient (walk-in) and generate a queue ticket.
 }
 ```
 
+---
+
+### Non-Patient Check-in
+
+Create a non-patient queue entry (for visitors, companions, etc.).
+
+**Endpoint**: `POST /ws/rest/v1/patientqueueing/nonpatientqueue`
+
 **Example**:
 ```bash
 curl -X POST \
-  'http://localhost:8080/openmrs/ws/rest/v1/patientqueueing/checkin/checkInNonPatient' \
+  'http://localhost:8080/openmrs/ws/rest/v1/patientqueueing/nonpatientqueue' \
   -d 'displayName=Jane Smith' \
   -d 'phoneNumber=+1234567890' \
-  -d 'location=b1e39c4d-1234-5678-9abc-def456789013' \
+  -d 'locationTo=b1e39c4d-1234-5678-9abc-def456789013' \
   -d 'queueRoom=c1e39c4d-1234-5678-9abc-def456789014'
 ```
 
@@ -139,7 +154,7 @@ curl -X POST \
 
 Look up a queue entry by ticket number. Searches both patient and non-patient queues.
 
-**Endpoint**: `GET /ws/rest/v1/patientqueueing/kiosk`
+**Endpoint**: `GET /ws/rest/v1/kiosk`
 
 **Parameters**:
 | Parameter | Type | Required | Description |
@@ -174,14 +189,14 @@ Look up a queue entry by ticket number. Searches both patient and non-patient qu
 **Example**:
 ```bash
 curl -X GET \
-  'http://localhost:8080/openmrs/ws/rest/v1/patientqueueing/kiosk?ticketNumber=21/04/2026-LOC-001'
+  'http://localhost:8080/openmrs/ws/rest/v1/kiosk?ticketNumber=21/04/2026-LOC-001'
 ```
 
 ### Get All Queue Entries
 
 Get all queue entries for a location, including both patient and non-patient queues.
 
-**Endpoint**: `GET /ws/rest/v1/patientqueueing/kiosk`
+**Endpoint**: `GET /ws/rest/v1/kiosk`
 
 **Parameters**:
 | Parameter | Type | Required | Description |
@@ -223,14 +238,14 @@ Get all queue entries for a location, including both patient and non-patient que
 **Example**:
 ```bash
 curl -X GET \
-  'http://localhost:8080/openmrs/ws/rest/v1/patientqueueing/kiosk?location=b1e39c4d-1234-5678-9abc-def456789013&status=PENDING'
+  'http://localhost:8080/openmrs/ws/rest/v1/kiosk?location=b1e39c4d-1234-5678-9abc-def456789013&status=PENDING'
 ```
 
 ### Get Queue Display Data
 
 Get display data for public queue monitors, including "now serving" and "up next" information.
 
-**Endpoint**: `GET /ws/rest/v1/patientqueueing/display`
+**Endpoint**: `GET /ws/rest/v1/display`
 
 **Parameters**:
 | Parameter | Type | Required | Description |

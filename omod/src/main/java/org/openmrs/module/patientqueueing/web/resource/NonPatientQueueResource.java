@@ -30,7 +30,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.Map;
 
-@Resource(name = RestConstants.VERSION_1 + "/nonpatientqueue", supportedClass = NonPatientQueue.class, supportedOpenmrsVersions = { "1.9.* - 9.*" })
+@Resource(name = RestConstants.VERSION_1 + "/patientqueueing/nonpatientqueue", supportedClass = NonPatientQueue.class, supportedOpenmrsVersions = { "1.9.* - 9.*" })
 public class NonPatientQueueResource extends DelegatingCrudResource<NonPatientQueue> {
 	
 	@Override
@@ -148,7 +148,7 @@ public class NonPatientQueueResource extends DelegatingCrudResource<NonPatientQu
 		    toDate);
 		
 		// Filter out COMPLETED entries unless includeHistory is true
-		if (!includeHistory && queues != null) {
+		if (!includeHistory && queues != null && status != NonPatientQueue.NonPatientQueueStatus.COMPLETED) {
 			List<NonPatientQueue> filtered = new ArrayList<NonPatientQueue>();
 			for (NonPatientQueue queue : queues) {
 				if (queue.getStatus() != NonPatientQueue.NonPatientQueueStatus.COMPLETED) {
@@ -333,7 +333,7 @@ public class NonPatientQueueResource extends DelegatingCrudResource<NonPatientQu
 		}
 		
 		// Filter out COMPLETED entries unless includeHistory is true
-		if (!includeHistory && results != null) {
+		if (!includeHistory && results != null && status != NonPatientQueue.NonPatientQueueStatus.COMPLETED) {
 			List<NonPatientQueue> filtered = new ArrayList<NonPatientQueue>();
 			for (NonPatientQueue queue : results) {
 				if (queue.getStatus() != NonPatientQueue.NonPatientQueueStatus.COMPLETED) {

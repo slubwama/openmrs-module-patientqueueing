@@ -129,6 +129,7 @@
 					<configuration>
 						<useSystemClassLoader>false</useSystemClassLoader>
 						<junitArtifactName>junit:junit</junitArtifactName>
+						<!-- add-opens flags removed - they are Java 9+ only and this module targets Java 8 -->
 					</configuration>
 					<dependencies>
 						<dependency>

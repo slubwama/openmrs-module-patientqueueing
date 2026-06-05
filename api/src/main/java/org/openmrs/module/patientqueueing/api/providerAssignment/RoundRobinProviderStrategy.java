@@ -13,6 +13,7 @@ import org.openmrs.Location;
 import org.openmrs.Provider;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -44,7 +45,7 @@ public class RoundRobinProviderStrategy implements ProviderAssignmentStrategy {
 		
 		synchronized (lock) {
 			state = stateMap.get(locationKey);
-			if (state == null || state.getProviderList() != availableProviders) {
+			if (state == null || !isSameProviderList(state.getProviderList(), availableProviders)) {
 				state = new RoundRobinState(availableProviders);
 				stateMap.put(locationKey, state);
 			}
@@ -56,6 +57,29 @@ public class RoundRobinProviderStrategy implements ProviderAssignmentStrategy {
 	@Override
 	public String getName() {
 		return "roundRobin";
+	}
+	
+	/**
+	 * Check if two provider lists contain the same providers (by UUID)
+	 */
+	private boolean isSameProviderList(List<Provider> list1, List<Provider> list2) {
+		if (list1 == list2) {
+			return true;
+		}
+		if (list1 == null || list2 == null || list1.size() != list2.size()) {
+			return false;
+		}
+		// Compare by UUID to handle different list instances with same contents
+		for (int i = 0; i < list1.size(); i++) {
+			Provider p1 = list1.get(i);
+			Provider p2 = list2.get(i);
+			String uuid1 = p1 != null ? p1.getUuid() : null;
+			String uuid2 = p2 != null ? p2.getUuid() : null;
+			if (!Objects.equals(uuid1, uuid2)) {
+				return false;
+			}
+		}
+		return true;
 	}
 	
 	private static class RoundRobinState {

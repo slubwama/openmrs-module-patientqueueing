@@ -33,6 +33,8 @@ public final class PatientQueueingConfig {
 	
 	public static final String GP_PROVIDER_ASSIGNMENT_STRATEGY = "patientqueueing.providerAssignmentStrategy";
 	
+	public static final String GP_AUTO_ASSIGN_PROVIDER = "patientqueueing.autoAssignProvider";
+	
 	public static final String GP_AUTO_CREATE_VISIT = "patientqueueing.autoCreateVisit";
 	
 	public static final String GP_DEFAULT_VISIT_TYPE = "patientqueueing.defaultVisitTypeUuid";
@@ -68,6 +70,8 @@ public final class PatientQueueingConfig {
 	// Default Values
 	
 	public static final String DEFAULT_PROVIDER_ASSIGNMENT_STRATEGY = "leastBusy";
+	
+	public static final boolean DEFAULT_AUTO_ASSIGN_PROVIDER = true;
 	
 	public static final boolean DEFAULT_AUTO_CREATE_VISIT = true;
 	

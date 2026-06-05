@@ -95,6 +95,16 @@ public class ProviderAssignmentServiceImpl extends BaseOpenmrsService implements
 	public List<Provider> getProvidersForLocation(Location location) {
 		List<Provider> providers = new ArrayList<>();
 
+		// TODO: This method currently returns ALL non-retired providers without filtering by location.
+		// The location parameter is IGNORED, which means all providers are considered available
+		// for all locations. This needs to be fixed to properly filter providers by their assigned locations.
+		//
+		// Possible implementations:
+		// 1. Use OpenMRS ProviderService.getProviders(person, location, ...) if available
+		// 2. Add a provider_location_mapping table to the module
+		// 3. Use a global property or concept to map providers to locations
+		// 4. Check provider attributes for location assignments
+
 		for (Provider provider : Context.getProviderService().getAllProviders(false)) {
 			if (provider.getPerson() != null && !provider.getRetired()) {
 				// Check if provider is assigned to this location
