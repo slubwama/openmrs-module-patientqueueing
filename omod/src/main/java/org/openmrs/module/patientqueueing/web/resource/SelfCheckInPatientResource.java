@@ -10,6 +10,7 @@
 package org.openmrs.module.patientqueueing.web.resource;
 
 import org.apache.commons.lang3.StringUtils;
+import org.openmrs.Concept;
 import org.openmrs.Location;
 import org.openmrs.Patient;
 import org.openmrs.PersonAttributeType;
@@ -19,7 +20,8 @@ import org.openmrs.api.AdministrationService;
 import org.openmrs.api.VisitService;
 import org.openmrs.api.context.Context;
 import org.openmrs.module.patientqueueing.api.PatientQueueingService;
-import org.openmrs.module.patientqueueing.web.customdto.CheckInPatient;
+import org.openmrs.module.patientqueueing.web.customdto.SelfCheckIn;
+import org.openmrs.module.patientqueueing.model.NonPatientQueue;
 import org.openmrs.module.patientqueueing.model.PatientQueue;
 import org.openmrs.module.patientqueueing.PatientQueueingConfig;
 import org.openmrs.module.webservices.rest.SimpleObject;
@@ -44,52 +46,65 @@ import java.util.Date;
 import java.util.List;
 
 /**
- * UgandaEMR-compatible endpoint for patient self check-in. Follows UgandaEMR pattern with
- * CheckInPatient DTO and DelegatingCrudResource extension. Resource path:
- * /ws/rest/v1/patientqueue/selfcheckinpatient Uses global properties to configure: - Person
- * attribute type for phone number lookup - Patient identifier types for identifier lookup
+ * UgandaEMR-compatible endpoint for self check-in supporting both Patients and NonPatients. Follows
+ * UgandaEMR pattern with SelfCheckIn DTO (extends CheckInPatient) and DelegatingCrudResource
+ * extension. Resource path: /ws/rest/v1/patientqueueing/selfcheckin
+ * <p>
+ * Check-in logic: 1. If patient identification (identifierTypeUuid + identifierValue OR configured
+ * attribute types) is provided, try to find a matching patient first 2. If not found but phone
+ * number provided, check if phone matches any patient using GP_PHONE_NUMBER_ATTRIBUTE_TYPE 3. If
+ * patient found → create PatientQueue + Visit 4. If no patient found → create NonPatientQueue
+ * (using displayName, phoneNumber, etc.)
+ * <p>
+ * Uses global properties to configure: - Person attribute types for phone number lookup
+ * (GP_PHONE_NUMBER_ATTRIBUTE_TYPE) - Patient identifier types for identifier lookup
+ * (GP_SELF_CHECK_IN_IDENTIFIER_TYPE_UUIDS) - Person attribute types for lookup
+ * (GP_SELF_CHECK_IN_PERSON_ATTRIBUTE_TYPE_UUIDS)
  */
-@Resource(name = RestConstants.VERSION_1 + "/patientqueueing/selfcheckin", supportedClass = CheckInPatient.class, supportedOpenmrsVersions = { "1.9.* - 9.*" })
-public class SelfCheckInPatientResource extends DelegatingCrudResource<CheckInPatient> {
+@Resource(name = RestConstants.VERSION_1 + "/patientqueueing/selfcheckin", supportedClass = SelfCheckIn.class, supportedOpenmrsVersions = { "1.9.* - 9.*" })
+public class SelfCheckInPatientResource extends DelegatingCrudResource<SelfCheckIn> {
 	
 	private static final Logger log = LoggerFactory.getLogger(SelfCheckInPatientResource.class);
 	
+	private static final String CHECK_IN_TYPE_PATIENT = "patient";
+	
+	private static final String CHECK_IN_TYPE_NON_PATIENT = "nonPatient";
+	
 	@Override
-	public CheckInPatient newDelegate() {
-		return new CheckInPatient();
+	public SelfCheckIn newDelegate() {
+		return new SelfCheckIn();
 	}
 	
 	@Override
-	public CheckInPatient save(CheckInPatient delegate) {
+	public SelfCheckIn save(SelfCheckIn delegate) {
 		throw new ResourceDoesNotSupportOperationException("Use create() instead");
 	}
 	
 	@Override
 	public Object create(SimpleObject propertiesToCreate, RequestContext context) throws ResponseException {
-		PatientQueueingService service = Context.getService(PatientQueueingService.class);
+		// Cache services for this request
+		PatientQueueingService queueingService = Context.getService(PatientQueueingService.class);
+		AdministrationService administrationService = Context.getAdministrationService();
 		
-		// Get patient identification using UUID-based approach
+		// Cache global properties (eliminates repeated DB lookups)
+		String phoneNumberAttributeTypeUuid = trimToNull(administrationService
+		        .getGlobalProperty(PatientQueueingConfig.GP_PHONE_NUMBER_ATTRIBUTE_TYPE));
+		String personAttributeTypeUuidsStr = trimToNull(administrationService
+		        .getGlobalProperty(PatientQueueingConfig.GP_SELF_CHECK_IN_PERSON_ATTRIBUTE_TYPE_UUIDS));
+		String identifierTypeUuidsStr = trimToNull(administrationService
+		        .getGlobalProperty(PatientQueueingConfig.GP_SELF_CHECK_IN_IDENTIFIER_TYPE_UUIDS));
+		
+		// Get input parameters
 		String identifierTypeUuid = trimToNull(propertiesToCreate.get("identifierTypeUuid"));
 		String identifierValue = trimToNull(propertiesToCreate.get("identifierValue"));
-		
-		if (identifierTypeUuid == null || identifierValue == null) {
-			throw new IllegalArgumentException("identifierTypeUuid and identifierValue are required");
-		}
-		
-		// Resolve patient using UUID-based lookup
-		Patient patient = resolvePatientByUuid(identifierTypeUuid, identifierValue);
-		if (patient == null) {
-			throw new IllegalArgumentException("No patient found matching the provided details");
-		}
+		String phoneNumber = trimToNull(propertiesToCreate.get("phoneNumber"));
+		String displayName = trimToNull(propertiesToCreate.get("displayName"));
+		String queueTypeUuid = trimToNull(propertiesToCreate.get("queueTypeUuid"));
 		
 		// Get location parameters
 		String currentLocationUuid = getRequiredProperty(propertiesToCreate, "currentLocation");
 		String locationToUuid = getRequiredProperty(propertiesToCreate, "locationTo");
 		String queueRoomUuid = getRequiredProperty(propertiesToCreate, "queueRoom");
-		String providerUuid = trimToNull(propertiesToCreate.get("provider"));
-		String patientStatus = getRequiredProperty(propertiesToCreate, "patientStatus");
-		String visitType = getRequiredProperty(propertiesToCreate, "visitType");
-		String visitComment = trimToNull(propertiesToCreate.get("visitComment"));
 		Integer priority = parsePriority(propertiesToCreate.get("priority"));
 		
 		// Resolve locations
@@ -107,39 +122,29 @@ public class SelfCheckInPatientResource extends DelegatingCrudResource<CheckInPa
 			throw new IllegalArgumentException("Queue Room not found for UUID: " + queueRoomUuid);
 		}
 		
-		// Create patient queue
-		PatientQueue patientQueue = new PatientQueue();
-		patientQueue.setPatient(patient);
-		patientQueue.setLocationFrom(currentLocation);
-		patientQueue.setLocationTo(locationTo);
-		patientQueue.setQueueRoom(queueRoom);
-		patientQueue.setStatus(PatientQueue.Status.PENDING);
-		patientQueue.setDateCreated(new Date());
-		
-		// Generate visit number (ticket number)
-		String visitNumber = service.generateVisitNumber(locationTo, patient);
-		patientQueue.setVisitNumber(visitNumber);
-		
-		// Start a new visit for the patient (close any active visit first)
-		Visit visit = ensurePatientVisit(patient, locationTo);
-		
-		// Save the queue entry
-		patientQueue = service.savePatientQue(patientQueue);
-		
-		// Build response manually for better control
-		SimpleObject response = new SimpleObject();
-		response.add("uuid", patientQueue.getUuid());
-		response.add("patientQueue", buildPatientQueueObject(patientQueue));
-		response.add("patient", buildPatientObject(patient));
-		response.add("visit", visit != null ? buildVisitObject(visit) : null);
-		response.add("ticketNumber", visitNumber);
-		response.add("visitNumber", visitNumber);
-		
-		if (hasTypesDefined()) {
-			response.add(RestConstants.PROPERTY_FOR_TYPE, "CheckInPatient");
+		// Try to find patient using provided identification first
+		Patient patient = null;
+		if (identifierTypeUuid != null && identifierValue != null) {
+			patient = resolvePatientByIdentifier(identifierTypeUuid, identifierValue, personAttributeTypeUuidsStr,
+			    identifierTypeUuidsStr);
 		}
 		
-		return response;
+		// If no patient found via direct identification but phone number provided, check via phone attribute
+		if (patient == null && phoneNumber != null) {
+			patient = findPatientByPhoneNumber(phoneNumber, phoneNumberAttributeTypeUuid);
+		}
+		
+		// If patient found, create PatientQueue
+		if (patient != null) {
+			return createPatientCheckIn(queueingService, patient, currentLocation, locationTo, queueRoom, priority);
+		}
+		
+		// No patient found - validate and create NonPatientQueue
+		if (StringUtils.isBlank(displayName)) {
+			throw new IllegalArgumentException("displayName is required for non-patient check-in");
+		}
+		return createNonPatientCheckIn(queueingService, displayName, phoneNumber, queueTypeUuid, currentLocation,
+		    locationTo, queueRoom, priority);
 	}
 	
 	/**
@@ -149,11 +154,11 @@ public class SelfCheckInPatientResource extends DelegatingCrudResource<CheckInPa
 	private Visit ensurePatientVisit(Patient patient, Location location) {
 		try {
 			AdministrationService administrationService = Context.getAdministrationService();
-			String visitTypeUuid = administrationService.getGlobalProperty(
-			    PatientQueueingConfig.GP_SELF_CHECK_IN_VISIT_TYPE_UUID, "");
+			String visitTypeUuid = trimToNull(administrationService
+			        .getGlobalProperty(PatientQueueingConfig.GP_SELF_CHECK_IN_VISIT_TYPE_UUID));
 			
 			// If no visit type is configured, skip visit creation
-			if (StringUtils.isBlank(visitTypeUuid)) {
+			if (visitTypeUuid == null) {
 				log.info("No visit type configured for self check-in, skipping visit creation");
 				return null;
 			}
@@ -204,24 +209,119 @@ public class SelfCheckInPatientResource extends DelegatingCrudResource<CheckInPa
 	}
 	
 	/**
-	 * Get the configured visit type for self check-in visits
+	 * Find patient by phone number using the configured phone number attribute type.
 	 */
-	private VisitType getVisitType() {
+	private Patient findPatientByPhoneNumber(String phoneNumber, String phoneNumberAttributeTypeUuid) {
 		try {
-			AdministrationService administrationService = Context.getAdministrationService();
-			String visitTypeUuid = administrationService.getGlobalProperty(
-			    PatientQueueingConfig.GP_SELF_CHECK_IN_VISIT_TYPE_UUID, "");
-			
-			if (StringUtils.isBlank(visitTypeUuid)) {
+			if (StringUtils.isBlank(phoneNumberAttributeTypeUuid)) {
+				log.info("No phone number attribute type configured, skipping phone-based patient lookup");
 				return null;
 			}
 			
-			return Context.getVisitService().getVisitTypeByUuid(visitTypeUuid);
+			PersonAttributeType attributeType = Context.getPersonService().getPersonAttributeTypeByUuid(
+			    phoneNumberAttributeTypeUuid);
+			if (attributeType == null) {
+				log.warn("Phone number attribute type not found for UUID: " + phoneNumberAttributeTypeUuid);
+				return null;
+			}
+			
+			PatientQueueingService queueingService = Context.getService(PatientQueueingService.class);
+			return queueingService.getPatientByPersonAttributeValue(attributeType.getPersonAttributeTypeId(), phoneNumber);
 		}
 		catch (Exception e) {
-			log.warn("Error getting visit type: " + e.getMessage());
+			log.error("Error finding patient by phone number: " + e.getMessage(), e);
 			return null;
 		}
+	}
+	
+	/**
+	 * Create a patient check-in entry with PatientQueue and Visit.
+	 */
+	private SimpleObject createPatientCheckIn(PatientQueueingService service, Patient patient, Location currentLocation,
+	        Location locationTo, Location queueRoom, Integer priority) {
+		// Create patient queue
+		PatientQueue patientQueue = new PatientQueue();
+		patientQueue.setPatient(patient);
+		patientQueue.setLocationFrom(currentLocation);
+		patientQueue.setLocationTo(locationTo);
+		patientQueue.setQueueRoom(queueRoom);
+		patientQueue.setStatus(PatientQueue.Status.PENDING);
+		patientQueue.setDateCreated(new Date());
+		if (priority != null) {
+			patientQueue.setPriority(priority);
+		}
+		
+		// Generate visit number (ticket number)
+		String visitNumber = service.generateVisitNumber(locationTo, patient);
+		patientQueue.setVisitNumber(visitNumber);
+		
+		// Start a new visit for the patient
+		Visit visit = ensurePatientVisit(patient, locationTo);
+		
+		// Save the queue entry
+		patientQueue = service.savePatientQue(patientQueue);
+		
+		// Build response
+		SimpleObject response = new SimpleObject();
+		response.add("checkInType", CHECK_IN_TYPE_PATIENT);
+		response.add("uuid", patientQueue.getUuid());
+		response.add("patientQueue", buildPatientQueueObject(patientQueue));
+		response.add("patient", buildPatientObject(patient));
+		response.add("visit", visit != null ? buildVisitObject(visit) : null);
+		response.add("ticketNumber", visitNumber);
+		response.add("visitNumber", visitNumber);
+		
+		if (hasTypesDefined()) {
+			response.add(RestConstants.PROPERTY_FOR_TYPE, "SelfCheckIn");
+		}
+		
+		return response;
+	}
+	
+	/**
+	 * Create a non-patient check-in entry with NonPatientQueue.
+	 */
+	private SimpleObject createNonPatientCheckIn(PatientQueueingService service, String displayName, String phoneNumber,
+	        String queueTypeUuid, Location currentLocation, Location locationTo, Location queueRoom, Integer priority) {
+		// Resolve queue type
+		Concept queueType = null;
+		if (queueTypeUuid != null) {
+			queueType = Context.getConceptService().getConceptByUuid(queueTypeUuid);
+		}
+		
+		// Create non-patient queue entry
+		NonPatientQueue nonPatientQueue = service.createNonPatientQueueEntry(displayName, phoneNumber, queueType,
+		    currentLocation, locationTo, queueRoom, priority, null);
+		
+		// Build response
+		SimpleObject response = new SimpleObject();
+		response.add("checkInType", CHECK_IN_TYPE_NON_PATIENT);
+		response.add("uuid", nonPatientQueue.getUuid());
+		response.add("displayName", nonPatientQueue.getDisplayName());
+		response.add("phoneNumber", nonPatientQueue.getPhoneNumber());
+		response.add("ticketNumber", nonPatientQueue.getTicketNumber());
+		response.add("status", nonPatientQueue.getStatus());
+		response.add("nonPatientQueue", buildNonPatientQueueObject(nonPatientQueue));
+		
+		if (hasTypesDefined()) {
+			response.add(RestConstants.PROPERTY_FOR_TYPE, "SelfCheckIn");
+		}
+		
+		return response;
+	}
+	
+	/**
+	 * Build a SimpleObject representation of a NonPatientQueue.
+	 */
+	private SimpleObject buildNonPatientQueueObject(NonPatientQueue queue) {
+		SimpleObject queueObj = new SimpleObject();
+		queueObj.add("uuid", queue.getUuid());
+		queueObj.add("displayName", queue.getDisplayName());
+		queueObj.add("phoneNumber", queue.getPhoneNumber());
+		queueObj.add("ticketNumber", queue.getTicketNumber());
+		queueObj.add("status", queue.getStatus());
+		queueObj.add("dateCreated", queue.getDateCreated());
+		return queueObj;
 	}
 	
 	/**
@@ -242,7 +342,13 @@ public class SelfCheckInPatientResource extends DelegatingCrudResource<CheckInPa
 	private SimpleObject buildPatientObject(Patient patient) {
 		SimpleObject patientObj = new SimpleObject();
 		patientObj.add("uuid", patient.getUuid());
-		patientObj.add("display", patient.getPersonName().getFullName());
+		// Safely get person name - handle potential null
+		if (patient.getPersonName() != null) {
+			patientObj.add("display", patient.getPersonName().getFullName());
+		} else {
+			patientObj.add("display", patient.getPatientIdentifier() != null ? patient.getPatientIdentifier()
+			        .getIdentifier() : patient.getUuid());
+		}
 		// Add patient identifier if available
 		if (patient.getPatientIdentifier() != null) {
 			patientObj.add("patientId", patient.getPatientIdentifier().getIdentifier());
@@ -265,29 +371,27 @@ public class SelfCheckInPatientResource extends DelegatingCrudResource<CheckInPa
 	}
 	
 	/**
-	 * Resolve patient using UUID-based lookup strategy. This checks if the provided UUID is a
-	 * configured attribute type or identifier type, then searches accordingly.
+	 * Resolve patient by identifier type and value. Checks if the provided identifier type UUID is
+	 * configured as either a person attribute type or patient identifier type, then searches
+	 * accordingly.
+	 * 
+	 * @param identifierTypeUuid the UUID of the identifier type to search by
+	 * @param identifierValue the value to search for
+	 * @param personAttributeTypeUuidsStr CSV of configured person attribute type UUIDs
+	 * @param identifierTypeUuidsStr CSV of configured identifier type UUIDs
+	 * @return the matching Patient, or null if not found
 	 */
-	private Patient resolvePatientByUuid(String identifierTypeUuid, String identifierValue) {
-		AdministrationService administrationService = Context.getAdministrationService();
-		
-		// Get configured person attribute type UUIDs from global property
-		String personAttributeTypeUuidsStr = administrationService.getGlobalProperty(
-		    PatientQueueingConfig.GP_SELF_CHECK_IN_PERSON_ATTRIBUTE_TYPE_UUIDS, "");
-		
-		// Get configured identifier type UUIDs from global property
-		String identifierTypeUuidsStr = administrationService.getGlobalProperty(
-		    PatientQueueingConfig.GP_SELF_CHECK_IN_IDENTIFIER_TYPE_UUIDS, "");
-		
+	private Patient resolvePatientByIdentifier(String identifierTypeUuid, String identifierValue,
+	        String personAttributeTypeUuidsStr, String identifierTypeUuidsStr) {
 		// Check if self check-in is properly configured
-		if (StringUtils.isBlank(personAttributeTypeUuidsStr) && StringUtils.isBlank(identifierTypeUuidsStr)) {
+		if (personAttributeTypeUuidsStr == null && identifierTypeUuidsStr == null) {
 			log.error("Self check-in is not configured. Please contact your system administrator to configure person attribute types and identifier types.");
 			throw new IllegalArgumentException(
 			        "Self check-in is not configured. Please contact your system administrator to set up the required configurations.");
 		}
 		
 		// Check if it's a configured attribute type (person attribute like phone number)
-		if (Arrays.asList(personAttributeTypeUuidsStr.split(",")).contains(identifierTypeUuid.trim())) {
+		if (parseUuidSet(personAttributeTypeUuidsStr).contains(identifierTypeUuid.trim())) {
 			log.info("Looking up patient by person attribute type: " + identifierTypeUuid);
 			Patient patient = getPatientByPersonAttributes(identifierValue, personAttributeTypeUuidsStr);
 			if (patient != null) {
@@ -296,7 +400,7 @@ public class SelfCheckInPatientResource extends DelegatingCrudResource<CheckInPa
 		}
 		
 		// Check if it's a configured identifier type (patient identifier like National ID)
-		if (Arrays.asList(identifierTypeUuidsStr.split(",")).contains(identifierTypeUuid.trim())) {
+		if (parseUuidSet(identifierTypeUuidsStr).contains(identifierTypeUuid.trim())) {
 			log.info("Looking up patient by identifier type: " + identifierTypeUuid);
 			Patient patient = getPatientByIdentifier(identifierValue, identifierTypeUuid);
 			if (patient != null) {
@@ -351,10 +455,15 @@ public class SelfCheckInPatientResource extends DelegatingCrudResource<CheckInPa
 	 */
 	private Patient getPatientByIdentifier(String identifierValue, String identifierTypeUuid) {
 		try {
+			org.openmrs.PatientIdentifierType identifierType = Context.getPatientService().getPatientIdentifierTypeByUuid(
+			    identifierTypeUuid);
+			if (identifierType == null) {
+				log.warn("Patient identifier type not found for UUID: " + identifierTypeUuid);
+				return null;
+			}
+			
 			List<org.openmrs.PatientIdentifier> identifiers = Context.getPatientService().getPatientIdentifiers(
-			    identifierValue,
-			    Arrays.asList(Context.getPatientService().getPatientIdentifierTypeByUuid(identifierTypeUuid)), null, null,
-			    null);
+			    identifierValue, Arrays.asList(identifierType), null, null, null);
 			
 			if (identifiers == null || identifiers.isEmpty()) {
 				return null;
@@ -402,18 +511,38 @@ public class SelfCheckInPatientResource extends DelegatingCrudResource<CheckInPa
 		return s.isEmpty() ? null : s;
 	}
 	
+	private static final java.util.Set<String> EMPTY_UUID_SET = java.util.Collections.emptySet();
+	
+	/**
+	 * Parse a CSV string of UUIDs into a Set for efficient lookups. Empty or blank strings return
+	 * an empty set.
+	 */
+	private java.util.Set<String> parseUuidSet(String csv) {
+		if (StringUtils.isBlank(csv)) {
+			return EMPTY_UUID_SET;
+		}
+		java.util.Set<String> uuids = new java.util.HashSet<String>();
+		for (String uuid : csv.split(",")) {
+			String trimmed = uuid.trim();
+			if (StringUtils.isNotBlank(trimmed)) {
+				uuids.add(trimmed);
+			}
+		}
+		return uuids;
+	}
+	
 	@Override
 	public Object update(String uuid, SimpleObject propertiesToUpdate, RequestContext context) throws ResponseException {
 		throw new ResourceDoesNotSupportOperationException("Operation not supported");
 	}
 	
 	@Override
-	public CheckInPatient getByUniqueId(String uniqueId) {
+	public SelfCheckIn getByUniqueId(String uniqueId) {
 		throw new ResourceDoesNotSupportOperationException("Operation not supported");
 	}
 	
 	@Override
-	public NeedsPaging<CheckInPatient> doGetAll(RequestContext context) throws ResponseException {
+	public NeedsPaging<SelfCheckIn> doGetAll(RequestContext context) throws ResponseException {
 		throw new ResourceDoesNotSupportOperationException("Operation not supported");
 	}
 	
@@ -425,9 +554,14 @@ public class SelfCheckInPatientResource extends DelegatingCrudResource<CheckInPa
 	@Override
 	public DelegatingResourceDescription getRepresentationDescription(Representation rep) {
 		DelegatingResourceDescription description = new DelegatingResourceDescription();
+		description.addProperty("checkInType");
 		description.addProperty("uuid");
+		description.addProperty("ticketNumber");
 		description.addProperty("patientQueue");
+		description.addProperty("nonPatientQueue");
 		description.addProperty("patient");
+		description.addProperty("displayName");
+		description.addProperty("phoneNumber");
 		description.addProperty("visit");
 		description.addSelfLink();
 		
@@ -439,12 +573,12 @@ public class SelfCheckInPatientResource extends DelegatingCrudResource<CheckInPa
 	}
 	
 	@Override
-	protected void delete(CheckInPatient delegate, String s, RequestContext requestContext) throws ResponseException {
+	protected void delete(SelfCheckIn delegate, String s, RequestContext requestContext) throws ResponseException {
 		throw new ResourceDoesNotSupportOperationException("Operation not supported");
 	}
 	
 	@Override
-	public void purge(CheckInPatient delegate, RequestContext requestContext) throws ResponseException {
+	public void purge(SelfCheckIn delegate, RequestContext requestContext) throws ResponseException {
 		throw new ResourceDoesNotSupportOperationException("Operation not supported");
 	}
 	
@@ -453,13 +587,12 @@ public class SelfCheckInPatientResource extends DelegatingCrudResource<CheckInPa
 		DelegatingResourceDescription description = new DelegatingResourceDescription();
 		description.addProperty("identifierTypeUuid");
 		description.addProperty("identifierValue");
+		description.addProperty("phoneNumber");
+		description.addProperty("displayName");
+		description.addProperty("queueTypeUuid");
 		description.addProperty("currentLocation");
 		description.addProperty("locationTo");
 		description.addProperty("queueRoom");
-		description.addProperty("provider");
-		description.addProperty("patientStatus");
-		description.addProperty("visitType");
-		description.addProperty("visitComment");
 		description.addProperty("priority");
 		return description;
 	}
