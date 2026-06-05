@@ -43,7 +43,7 @@ import java.util.List;
  * Query-params are treated as SEARCH by OpenMRS REST -> doSearch(...) must be implemented. Follows
  * UgandaEMR QueueDisplayResource pattern for clean, maintainable code.
  */
-@Resource(name = RestConstants.VERSION_1 + "/display", supportedClass = QueueDisplayDto.class, supportedOpenmrsVersions = { "1.9.* - 9.*" })
+@Resource(name = RestConstants.VERSION_1 + "/patientqueueing/display", supportedClass = QueueDisplayDto.class, supportedOpenmrsVersions = { "1.9.* - 9.*" })
 public class QueueDisplayResource extends DelegatingCrudResource<QueueDisplayDto> {
 	
 	private PatientQueueingService service() {

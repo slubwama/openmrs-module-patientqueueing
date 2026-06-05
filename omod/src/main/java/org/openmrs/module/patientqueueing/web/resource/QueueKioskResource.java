@@ -45,7 +45,7 @@ import java.util.regex.Pattern;
  * queues Supports ticket lookup by ticket number Handles both our clean API and
  * UgandaEMR-compatible requests for backward compatibility
  */
-@Resource(name = RestConstants.VERSION_1 + "/kiosk", supportedClass = SimpleObject.class, supportedOpenmrsVersions = { "1.9.* - 9.*" })
+@Resource(name = RestConstants.VERSION_1 + "/patientqueueing/kiosk", supportedClass = SimpleObject.class, supportedOpenmrsVersions = { "1.9.* - 9.*" })
 public class QueueKioskResource extends DelegatingCrudResource<SimpleObject> {
 	
 	private static final int PATIENT_SEARCH_LIMIT = 5000;

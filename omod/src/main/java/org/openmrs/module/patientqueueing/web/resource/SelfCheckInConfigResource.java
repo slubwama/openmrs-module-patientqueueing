@@ -35,7 +35,7 @@ import java.util.List;
  * REST resource for exposing self check-in configuration to kiosk app. This allows the kiosk to
  * dynamically determine which input fields to display. GET /ws/rest/v1/selfcheckinconfig
  */
-@Resource(name = RestConstants.VERSION_1 + "/selfcheckinconfig", supportedClass = SelfCheckInConfig.class, supportedOpenmrsVersions = { "1.9.* - 9.*" })
+@Resource(name = RestConstants.VERSION_1 + "/patientqueueing/selfcheckinconfig", supportedClass = SelfCheckInConfig.class, supportedOpenmrsVersions = { "1.9.* - 9.*" })
 public class SelfCheckInConfigResource extends DelegatingCrudResource<SelfCheckInConfig> {
 	
 	private static final Logger log = LoggerFactory.getLogger(SelfCheckInConfigResource.class);
