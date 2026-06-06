@@ -9,6 +9,7 @@
  */
 package org.openmrs.module.patientqueueing.api.impl;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.openmrs.Location;
@@ -36,6 +37,8 @@ import java.util.Map;
 public class ProviderAssignmentServiceImpl extends BaseOpenmrsService implements ProviderAssignmentService {
 	
 	private static final Log log = LogFactory.getLog(ProviderAssignmentServiceImpl.class);
+	
+	private static final String USER_DEFAULT_LOCATION_PROPERTY = "defaultLocation";
 	
 	private ProviderAssignmentStrategy strategy;
 	
@@ -95,26 +98,155 @@ public class ProviderAssignmentServiceImpl extends BaseOpenmrsService implements
 	public List<Provider> getProvidersForLocation(Location location) {
 		List<Provider> providers = new ArrayList<>();
 
-		// TODO: This method currently returns ALL non-retired providers without filtering by location.
-		// The location parameter is IGNORED, which means all providers are considered available
-		// for all locations. This needs to be fixed to properly filter providers by their assigned locations.
-		//
-		// Possible implementations:
-		// 1. Use OpenMRS ProviderService.getProviders(person, location, ...) if available
-		// 2. Add a provider_location_mapping table to the module
-		// 3. Use a global property or concept to map providers to locations
-		// 4. Check provider attributes for location assignments
+		if (location == null) {
+			log.warn("Location is null, returning empty provider list");
+			return providers;
+		}
+
+		AdministrationService adminService = Context.getAdministrationService();
+		String locationAttributeTypeUuid = adminService.getGlobalProperty(
+		    PatientQueueingConfig.GP_PROVIDER_LOCATION_ATTRIBUTE_TYPE_UUID);
+
+		// Pre-fetch the attribute type if configured (performance optimization)
+		org.openmrs.ProviderAttributeType attributeType = null;
+		if (StringUtils.isNotBlank(locationAttributeTypeUuid)) {
+			try {
+				attributeType = Context.getProviderService().getProviderAttributeTypeByUuid(locationAttributeTypeUuid);
+				if (attributeType == null) {
+					log.warn("Provider attribute type configured but not found: " + locationAttributeTypeUuid
+					        + ". Falling back to user default location approach.");
+				}
+			} catch (Exception e) {
+				log.error("Error fetching provider attribute type: " + e.getMessage(), e);
+			}
+		}
+
+		// Get the configured person location attribute name for fallback approach
+		String personLocationAttrName = adminService.getGlobalProperty(
+		    PatientQueueingConfig.GP_PERSON_LOCATION_ATTRIBUTE_NAME, "defaultLocation");
 
 		for (Provider provider : Context.getProviderService().getAllProviders(false)) {
-			if (provider.getPerson() != null) {
-				// Check if provider is assigned to this location
-				// This is a simplified check - in real implementation, you'd have
-				// a proper provider-location mapping
+			if (provider.getPerson() == null) {
+				continue;
+			}
+
+			// Approach 1: Use provider attribute if configured, otherwise use user default location
+			boolean providerMatchesLocation = attributeType != null
+			        ? isProviderAtLocationViaAttribute(provider, location, attributeType)
+			        : isProviderAtLocationViaUserDefaultLocation(provider, location, personLocationAttrName);
+
+			if (providerMatchesLocation) {
 				providers.add(provider);
 			}
 		}
 
+		// Log if no providers found for location (helps with configuration issues)
+		if (providers.isEmpty() && log.isDebugEnabled()) {
+			log.debug("No providers found for location: " + location.getName() + " (" + location.getUuid() + ")");
+		}
+
 		return providers;
+	}
+	
+	/**
+	 * Check if a provider is assigned to a location via a provider attribute.
+	 * 
+	 * @param provider the provider to check
+	 * @param location the location to match
+	 * @param attributeType the pre-fetched attribute type (never null when this method is called)
+	 * @return true if the provider has an attribute of the given type with a value matching the
+	 *         location
+	 */
+	private boolean isProviderAtLocationViaAttribute(Provider provider, Location location,
+	        org.openmrs.ProviderAttributeType attributeType) {
+		try {
+			for (org.openmrs.ProviderAttribute attribute : provider.getActiveAttributes()) {
+				if (attribute == null || attribute.getAttributeType() == null) {
+					continue;
+				}
+				if (!attribute.getAttributeType().getId().equals(attributeType.getId())) {
+					continue;
+				}
+				if (attribute.getValue() == null) {
+					continue;
+				}
+				return matchesLocationUuid(attribute.getValue().toString(), location);
+			}
+			return false;
+		}
+		catch (Exception e) {
+			log.error("Error checking provider location via attribute: " + e.getMessage(), e);
+			return false;
+		}
+	}
+	
+	/**
+	 * Check if a provider is assigned to a location via their associated user's default location.
+	 * <p>
+	 * This method finds the User associated with the provider's Person and checks if the user has a
+	 * default location that matches the given location. The default location can be configured via:
+	 * <ul>
+	 * <li>User properties (keyed by {@link #USER_DEFAULT_LOCATION_PROPERTY})</li>
+	 * <li>Person attributes (attribute type name configurable via
+	 * GP_PERSON_LOCATION_ATTRIBUTE_NAME)</li>
+	 * </ul>
+	 * 
+	 * @param provider the provider to check
+	 * @param location the location to match
+	 * @param personLocationAttrName the person attribute type name to check for location
+	 *            assignments
+	 * @return true if the provider's associated user has a default location matching the given
+	 *         location
+	 */
+	private boolean isProviderAtLocationViaUserDefaultLocation(Provider provider, Location location,
+	        String personLocationAttrName) {
+		try {
+			List<org.openmrs.User> users = Context.getUserService().getUsersByPerson(provider.getPerson(), false);
+			
+			if (users == null || users.isEmpty()) {
+				return false;
+			}
+			
+			// Check if any of the user's default locations match
+			for (org.openmrs.User user : users) {
+				// Check user properties for default location (stored as location UUID)
+				Map<String, String> userProperties = user.getUserProperties();
+				if (userProperties != null) {
+					String defaultLocationUuid = userProperties.get(USER_DEFAULT_LOCATION_PROPERTY);
+					if (matchesLocationUuid(defaultLocationUuid, location)) {
+						return true;
+					}
+				}
+				
+				// Alternative: Check if the person has a location attribute
+				if (provider.getPerson().getAttributes() != null) {
+					org.openmrs.PersonAttribute locationAttr = provider.getPerson().getAttribute(personLocationAttrName);
+					if (locationAttr != null && locationAttr.getValue() != null) {
+						if (matchesLocationUuid(locationAttr.getValue().toString(), location)) {
+							return true;
+						}
+					}
+				}
+			}
+			
+			return false;
+			
+		}
+		catch (Exception e) {
+			log.error("Error checking provider location via user default location: " + e.getMessage(), e);
+			return false;
+		}
+	}
+	
+	/**
+	 * Check if a trimmed string value matches the location's UUID.
+	 * 
+	 * @param value the string value to check (may be null)
+	 * @param location the location to match against
+	 * @return true if value is not blank and equals the location's UUID
+	 */
+	private boolean matchesLocationUuid(String value, Location location) {
+		return StringUtils.isNotBlank(value) && location.getUuid().equals(value.trim());
 	}
 	
 	@Override

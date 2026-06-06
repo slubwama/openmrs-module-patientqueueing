@@ -33,6 +33,10 @@ public final class PatientQueueingConfig {
 	
 	public static final String GP_PROVIDER_ASSIGNMENT_STRATEGY = "patientqueueing.providerAssignmentStrategy";
 	
+	public static final String GP_PROVIDER_LOCATION_ATTRIBUTE_TYPE_UUID = "patientqueueing.providerLocationAttributeTypeUuid";
+	
+	public static final String GP_PERSON_LOCATION_ATTRIBUTE_NAME = "patientqueueing.personLocationAttributeName";
+	
 	public static final String GP_AUTO_ASSIGN_PROVIDER = "patientqueueing.autoAssignProvider";
 	
 	public static final String GP_AUTO_CREATE_VISIT = "patientqueueing.autoCreateVisit";
