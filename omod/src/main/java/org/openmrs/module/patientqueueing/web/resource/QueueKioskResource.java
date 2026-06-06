@@ -1,15 +1,8 @@
 package org.openmrs.module.patientqueueing.web.resource;
 
 import org.openmrs.Location;
-import org.openmrs.LocationTag;
 import org.openmrs.Patient;
-import org.openmrs.PatientIdentifier;
-import org.openmrs.PersonAttribute;
-import org.openmrs.PersonAttributeType;
-import org.openmrs.api.AdministrationService;
-import org.openmrs.api.APIException;
 import org.openmrs.api.context.Context;
-import org.openmrs.module.patientqueueing.PatientQueueingConfig;
 import org.openmrs.module.patientqueueing.api.PatientQueueingService;
 import org.openmrs.module.patientqueueing.web.customdto.QueueEntry;
 import org.openmrs.module.patientqueueing.model.NonPatientQueue;
@@ -27,16 +20,16 @@ import org.openmrs.module.webservices.rest.web.resource.impl.NeedsPaging;
 import org.openmrs.util.OpenmrsUtil;
 
 import java.text.SimpleDateFormat;
-import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.HashSet;
+import java.util.Calendar;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -48,9 +41,11 @@ import java.util.regex.Pattern;
 @Resource(name = RestConstants.VERSION_1 + "/patientqueueing/kiosk", supportedClass = SimpleObject.class, supportedOpenmrsVersions = { "1.9.* - 9.*" })
 public class QueueKioskResource extends DelegatingCrudResource<SimpleObject> {
 	
-	private static final int PATIENT_SEARCH_LIMIT = 5000;
-	
 	private static final String ISO_DATE_FORMAT = "yyyy-MM-dd'T'HH:mm:ssXXX";
+	
+	private static final Pattern DDMMYYYY_PATTERN = Pattern.compile("^(\\d{2})\\/(\\d{2})\\/(\\d{4})-");
+	
+	private static final Pattern YYYYMMDD_PATTERN = Pattern.compile("^(\\d{4})-(\\d{2})-(\\d{2})-");
 	
 	/**
 	 * Cache for queue room statistics to avoid N+1 queries
@@ -210,32 +205,30 @@ public class QueueKioskResource extends DelegatingCrudResource<SimpleObject> {
 		}
 		
 		// Pattern for DD/MM/YYYY-XXX format
-		Pattern ddmmyyyyPattern = Pattern.compile("^(\\d{2})/(\\d{2})/(\\d{4})-");
-		Matcher ddmmyyyyMatcher = ddmmyyyyPattern.matcher(ticketNumber);
+		Matcher ddmmyyyyMatcher = DDMMYYYY_PATTERN.matcher(ticketNumber);
 		if (ddmmyyyyMatcher.find()) {
 			try {
 				int day = Integer.parseInt(ddmmyyyyMatcher.group(1));
 				int month = Integer.parseInt(ddmmyyyyMatcher.group(2));
 				int year = Integer.parseInt(ddmmyyyyMatcher.group(3));
-				return new Date(year - 1900, month - 1, day); // Note: Date year is years since 1900
+				return createDateAtMidnight(year, month, day);
 			}
 			catch (NumberFormatException e) {
-				// Invalid date format, fall through
+				// Invalid date format - fall through to next pattern (ticket may have different format)
 			}
 		}
 		
 		// Pattern for YYYY-MM-DD-XXX format
-		Pattern yyyymmddPattern = Pattern.compile("^(\\d{4})-(\\d{2})-(\\d{2})-");
-		Matcher yyyymmddMatcher = yyyymmddPattern.matcher(ticketNumber);
+		Matcher yyyymmddMatcher = YYYYMMDD_PATTERN.matcher(ticketNumber);
 		if (yyyymmddMatcher.find()) {
 			try {
 				int year = Integer.parseInt(yyyymmddMatcher.group(1));
 				int month = Integer.parseInt(yyyymmddMatcher.group(2));
 				int day = Integer.parseInt(yyyymmddMatcher.group(3));
-				return new Date(year - 1900, month - 1, day); // Note: Date year is years since 1900
+				return createDateAtMidnight(year, month, day);
 			}
 			catch (NumberFormatException e) {
-				// Invalid date format
+				// Invalid date format - fall through (ticket may have different format)
 			}
 		}
 		
@@ -471,83 +464,6 @@ public class QueueKioskResource extends DelegatingCrudResource<SimpleObject> {
 	 * @param context the request context
 	 * @return list of QueueEntry objects
 	 */
-	public List<QueueEntry> getAllQueueEntries(RequestContext context) {
-		PatientQueueingService service = Context.getService(PatientQueueingService.class);
-		
-		String locationUuid = context.getParameter("location");
-		String queueRoomUuid = context.getParameter("queueRoom");
-		String statusParam = context.getParameter("status");
-		String dateFromParam = context.getParameter("dateFrom");
-		String dateToParam = context.getParameter("dateTo");
-		
-		// Parse date parameters
-		Date fromDate = null;
-		Date toDate = null;
-		
-		if (dateFromParam != null && !dateFromParam.isEmpty()) {
-			try {
-				fromDate = new Date(Long.parseLong(dateFromParam));
-			}
-			catch (NumberFormatException e) {
-				fromDate = OpenmrsUtil.firstSecondOfDay(new Date());
-			}
-		} else {
-			fromDate = OpenmrsUtil.firstSecondOfDay(new Date());
-		}
-		
-		if (dateToParam != null && !dateToParam.isEmpty()) {
-			try {
-				toDate = new Date(Long.parseLong(dateToParam));
-			}
-			catch (NumberFormatException e) {
-				toDate = OpenmrsUtil.getLastMomentOfDay(new Date());
-			}
-		} else {
-			toDate = OpenmrsUtil.getLastMomentOfDay(new Date());
-		}
-		
-		Location location = null;
-		Location queueRoom = null;
-		
-		if (locationUuid != null && !locationUuid.isEmpty()) {
-			location = Context.getLocationService().getLocationByUuid(locationUuid);
-		}
-		
-		if (queueRoomUuid != null && !queueRoomUuid.isEmpty()) {
-			queueRoom = Context.getLocationService().getLocationByUuid(queueRoomUuid);
-		}
-		
-		List<QueueEntry> entries = new ArrayList<QueueEntry>();
-		
-		// Get patient queues
-		List<PatientQueue> patientQueues = service.getPatientQueueList(null, fromDate, toDate, null, null, null,
-		    getPatientQueueStatus(statusParam), queueRoom);
-		
-		for (PatientQueue pq : patientQueues) {
-			if (location == null || (location.equals(pq.getLocationTo()) || location.equals(pq.getQueueRoom()))) {
-				entries.add(new QueueEntry(pq));
-			}
-		}
-		
-		// Get non-patient queues
-		List<NonPatientQueue> nonPatientQueues = service.getNonPatientQueues(getNonPatientQueueStatus(statusParam), null,
-		    location, queueRoom, fromDate, toDate);
-		
-		for (NonPatientQueue npq : nonPatientQueues) {
-			entries.add(new QueueEntry(npq));
-		}
-		
-		// Sort by date created (oldest first for FIFO)
-		Collections.sort(entries, new Comparator<QueueEntry>() {
-			
-			@Override
-			public int compare(QueueEntry e1, QueueEntry e2) {
-				return e1.getDateCreated().compareTo(e2.getDateCreated());
-			}
-		});
-		
-		return entries;
-	}
 	
 	/**
 	 * Parse patient queue status string to enum
@@ -912,6 +828,22 @@ public class QueueKioskResource extends DelegatingCrudResource<SimpleObject> {
 	 * @param fullName the full patient name
 	 * @return masked name, or null if input is null
 	 */
+	
+	/**
+	 * Creates a Date at midnight (00:00:00.000) for the given year, month, and day.
+	 * 
+	 * @param year the year (e.g., 2024)
+	 * @param month the month (1-12, will be converted to 0-11 for Calendar)
+	 * @param day the day of month
+	 * @return Date at midnight of the specified day
+	 */
+	private Date createDateAtMidnight(int year, int month, int day) {
+		Calendar cal = Calendar.getInstance();
+		cal.set(year, month - 1, day, 0, 0, 0);
+		cal.clear(Calendar.MILLISECOND);
+		return cal.getTime();
+	}
+	
 	private String maskPatientName(String fullName) {
 		if (fullName == null || fullName.trim().isEmpty()) {
 			return null;
