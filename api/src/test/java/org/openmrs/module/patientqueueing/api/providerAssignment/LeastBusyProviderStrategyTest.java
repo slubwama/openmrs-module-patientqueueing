@@ -134,13 +134,13 @@ public class LeastBusyProviderStrategyTest {
 		
 		// Provider1: 5 queues (3 COMPLETED, 2 active)
 		// Provider2: 3 queues (1 COMPLETED, 2 active)
-		// Should select provider2 (both have 2 active, but tie goes to first)
+		// Both providers have 2 active queues, so first wins (provider1)
 		mockMixedQueues(provider1, 3, 2); // 3 completed, 2 active
 		mockMixedQueues(provider2, 1, 2); // 1 completed, 2 active
 		
 		Provider result = strategy.assignProvider(testLocation, providers);
 		
-		// Both have 2 active queues, so first wins
+		// Both have 2 active queues, so first wins due to tie-breaking
 		assertEquals("Should count only non-COMPLETED queues", provider1, result);
 	}
 	

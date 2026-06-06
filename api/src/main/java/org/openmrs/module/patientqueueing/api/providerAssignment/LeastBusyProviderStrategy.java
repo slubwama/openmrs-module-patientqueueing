@@ -53,16 +53,9 @@ public class LeastBusyProviderStrategy implements ProviderAssignmentStrategy {
 		
 		// Sort providers by their current queue count (ascending)
 		final Location finalLocation = location;
-		List<Provider> sortedProviders = new ArrayList<Provider>(availableProviders);
-		Collections.sort(sortedProviders, new Comparator<Provider>() {
-			
-			@Override
-			public int compare(Provider p1, Provider p2) {
-				int count1 = getActiveQueueCount(finalLocation, p1);
-				int count2 = getActiveQueueCount(finalLocation, p2);
-				return Integer.compare(count1, count2);
-			}
-		});
+		final Date today = new Date();
+		List<Provider> sortedProviders = new ArrayList<>(availableProviders);
+		sortedProviders.sort(Comparator.comparingInt(p -> getActiveQueueCount(finalLocation, p, today)));
 		
 		return sortedProviders.get(0);
 	}
@@ -77,10 +70,11 @@ public class LeastBusyProviderStrategy implements ProviderAssignmentStrategy {
 	 * 
 	 * @param location the location
 	 * @param provider the provider
+	 * @param today the date to use for the query (ensures all comparisons use the same time
+	 *            reference)
 	 * @return the number of active queues
 	 */
-	private int getActiveQueueCount(Location location, Provider provider) {
-		Date today = new Date();
+	private int getActiveQueueCount(Location location, Provider provider, Date today) {
 		List<PatientQueue> queues = queueingService.getPatientQueueList(provider,
 		    org.openmrs.util.OpenmrsUtil.firstSecondOfDay(today), org.openmrs.util.OpenmrsUtil.getLastMomentOfDay(today),
 		    location, null, null, null, null);
