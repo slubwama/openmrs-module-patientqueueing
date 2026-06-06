@@ -28,11 +28,5 @@ public class PatientQueueControllerTest {
 	public void before() {
 		this.service = Context.getService(PatientQueueingService.class);
 	}
-	
-	// TODO: Restore test methods after updating to REST 3.x testing patterns
-	// The following tests depend on MainResourceControllerTest which moved in REST 3.x
-	// - shouldCreateAPatientQueue
-	// - shouldEditAPatientQueue
-	// - shouldVoidAPatientQueue
-	
+
 }
