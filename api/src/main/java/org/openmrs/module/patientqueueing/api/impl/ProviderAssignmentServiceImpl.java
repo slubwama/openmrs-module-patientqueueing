@@ -22,6 +22,7 @@ import org.openmrs.module.patientqueueing.api.PatientQueueingService;
 import org.openmrs.module.patientqueueing.api.ProviderAssignmentService;
 import org.openmrs.module.patientqueueing.api.providerAssignment.LeastBusyProviderStrategy;
 import org.openmrs.module.patientqueueing.api.providerAssignment.ProviderAssignmentStrategy;
+import org.openmrs.module.patientqueueing.api.providerAssignment.ManualProviderAssignmentStrategy;
 import org.openmrs.module.patientqueueing.api.providerAssignment.RandomProviderStrategy;
 import org.openmrs.module.patientqueueing.api.providerAssignment.RoundRobinProviderStrategy;
 import org.openmrs.module.patientqueueing.model.PatientQueue;
@@ -56,11 +57,7 @@ public class ProviderAssignmentServiceImpl extends BaseOpenmrsService implements
 		}
 		
 		ProviderAssignmentStrategy currentStrategy = getProviderAssignmentStrategy();
-		
-		if (currentStrategy == null) {
-			log.warn("No provider assignment strategy configured, using least busy strategy");
-			currentStrategy = new LeastBusyProviderStrategy();
-		}
+		// Strategy is always non-null after getProviderAssignmentStrategy()
 		
 		Provider provider = currentStrategy.assignProvider(location, availableProviders);
 		
@@ -73,6 +70,9 @@ public class ProviderAssignmentServiceImpl extends BaseOpenmrsService implements
 	
 	@Override
 	public ProviderAssignmentStrategy getProviderAssignmentStrategy() {
+		// NOTE: Strategy is cached for the lifetime of the module context.
+		// Changes to the GP_PROVIDER_ASSIGNMENT_STRATEGY global property require
+		// a module restart to take effect.
 		if (strategy != null) {
 			return strategy;
 		}
@@ -106,7 +106,7 @@ public class ProviderAssignmentServiceImpl extends BaseOpenmrsService implements
 		// 4. Check provider attributes for location assignments
 
 		for (Provider provider : Context.getProviderService().getAllProviders(false)) {
-			if (provider.getPerson() != null && !provider.getRetired()) {
+			if (provider.getPerson() != null) {
 				// Check if provider is assigned to this location
 				// This is a simplified check - in real implementation, you'd have
 				// a proper provider-location mapping
@@ -157,8 +157,8 @@ public class ProviderAssignmentServiceImpl extends BaseOpenmrsService implements
 			case PatientQueueingConfig.ProviderAssignmentStrategy.RANDOM:
 				return new RandomProviderStrategy();
 			case PatientQueueingConfig.ProviderAssignmentStrategy.MANUAL:
-				log.warn("Manual provider assignment strategy selected - will return null");
-				return null;
+				log.info("Manual provider assignment strategy selected");
+				return new ManualProviderAssignmentStrategy();
 			default:
 				log.warn("Unknown strategy: " + strategyName + ", using least busy strategy");
 				return new LeastBusyProviderStrategy();

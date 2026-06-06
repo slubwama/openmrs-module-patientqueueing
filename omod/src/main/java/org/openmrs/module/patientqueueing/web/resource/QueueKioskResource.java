@@ -381,11 +381,16 @@ public class QueueKioskResource extends DelegatingCrudResource<SimpleObject> {
 	}
 	
 	/**
-	 * Search for a queue entry by ticket number This searches both patient and non-patient queues
+	 * Search for a queue entry by ticket number. This searches both patient and non-patient queues.
+	 * <p>
+	 * Request parameters:
+	 * <ul>
+	 * <li>ticketNumber (required): the ticket number to search for</li>
+	 * <li>dateFrom (optional): start date as timestamp in milliseconds</li>
+	 * <li>dateTo (optional): end date as timestamp in milliseconds</li>
+	 * </ul>
 	 * 
-	 * @param ticketNumber the ticket number to search for
-	 * @param dateFrom optional start date (timestamp in milliseconds)
-	 * @param dateTo optional end date (timestamp in milliseconds)
+	 * @param context the request context containing the parameters
 	 * @return the QueueEntry if found
 	 */
 	public QueueEntry getQueueByTicketNumber(RequestContext context) {
@@ -873,8 +878,13 @@ public class QueueKioskResource extends DelegatingCrudResource<SimpleObject> {
 		// Build response
 		if (!patientQueues.isEmpty()) {
 			PatientQueue firstQueue = patientQueues.get(0);
-			journey.put("patientUuid", firstQueue.getPatient() != null ? firstQueue.getPatient().getUuid() : null);
-			journey.put("displayName", firstQueue.getPatient() != null ? firstQueue.getPatient().getPersonName().getFullName() : null);
+			// Privacy: Mask patient name for kiosk display (e.g., "John Doe" → "J. D***")
+			String fullName = firstQueue.getPatient() != null && firstQueue.getPatient().getPersonName() != null
+			        ? firstQueue.getPatient().getPersonName().getFullName()
+			        : null;
+			journey.put("displayName", maskPatientName(fullName));
+			// Security: Don't expose patientUuid in kiosk endpoint to prevent further patient data enumeration
+			journey.put("patientUuid", null);
 		} else if (!nonPatientQueues.isEmpty()) {
 			journey.put("displayName", nonPatientQueues.get(0).getDisplayName());
 			journey.put("patientUuid", null);
@@ -889,5 +899,38 @@ public class QueueKioskResource extends DelegatingCrudResource<SimpleObject> {
 		journey.put("nextServices", nextServices);
 
 		return journey;
+	}
+	
+	/**
+	 * Mask patient name for privacy in kiosk display. Examples: "John Doe" → "J. D***",
+	 * "Mary Jane Smith" → "M. J. S***"
+	 * 
+	 * @param fullName the full patient name
+	 * @return masked name, or null if input is null
+	 */
+	private String maskPatientName(String fullName) {
+		if (fullName == null || fullName.trim().isEmpty()) {
+			return null;
+		}
+		
+		String[] parts = fullName.trim().split("\\s+");
+		StringBuilder masked = new StringBuilder();
+		
+		for (int i = 0; i < parts.length; i++) {
+			String part = parts[i];
+			if (part.isEmpty()) {
+				continue;
+			}
+			// First character + dot + space (except last part)
+			if (part.length() > 0) {
+				masked.append(part.charAt(0));
+				if (i < parts.length - 1) {
+					masked.append(". ");
+				}
+			}
+		}
+		
+		masked.append("***");
+		return masked.toString();
 	}
 }

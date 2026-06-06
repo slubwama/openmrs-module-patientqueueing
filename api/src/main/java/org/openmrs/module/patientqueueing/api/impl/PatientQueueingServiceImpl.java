@@ -142,7 +142,10 @@ public class PatientQueueingServiceImpl extends BaseOpenmrsService implements Pa
 		Date fromDate = OpenmrsUtil.firstSecondOfDay(today);
 		Date toDate = OpenmrsUtil.getLastMomentOfDay(today);
 		
-		// Cluster-safe: Find an unused ticket number with retry logic
+		// NOT cluster-safe: Find an unused ticket number with retry logic
+		// This is check-then-insert with no DB uniqueness backing it.
+		// Two concurrent check-ins can read the same base number and mint duplicate tickets.
+		// The retry loop only defends against sequential collisions.
 		Set<Integer> uniquePatientIds = getUniquePatientIdsForToday(fromDate, toDate);
 		int baseNumber = uniquePatientIds.size() + 1;
 		
@@ -405,6 +408,10 @@ public class PatientQueueingServiceImpl extends BaseOpenmrsService implements Pa
 		List<Location> queueRoomList = new ArrayList<>();
 		if (queueRoom != null) {
 			flattenLocationHierarchy(queueRoom, queueRoomList, queueRoomTag, true);
+			// If queueRoom was provided but has no matching tagged locations, return empty result
+			if (queueRoomList.isEmpty()) {
+				return Collections.emptyList();
+			}
 		}
 
 		return dao.getNonPatientQueues(status, queueType, locationToList, queueRoomList, fromDate, toDate);
@@ -527,7 +534,10 @@ public class PatientQueueingServiceImpl extends BaseOpenmrsService implements Pa
 		Date fromDate = OpenmrsUtil.firstSecondOfDay(today);
 		Date toDate = OpenmrsUtil.getLastMomentOfDay(today);
 		
-		// Cluster-safe: Find an unused ticket number with retry logic
+		// NOT cluster-safe: Find an unused ticket number with retry logic
+		// This is check-then-insert with no DB uniqueness backing it.
+		// Two concurrent check-ins can read the same base number and mint duplicate tickets.
+		// The retry loop only defends against sequential collisions.
 		Long countToday = countNonPatientQueuesToday(fromDate, toDate);
 		int baseNumber = countToday.intValue() + 1;
 		

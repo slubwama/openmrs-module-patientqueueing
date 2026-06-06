@@ -28,5 +28,5 @@ public class PatientQueueControllerTest {
 	public void before() {
 		this.service = Context.getService(PatientQueueingService.class);
 	}
-
+	
 }

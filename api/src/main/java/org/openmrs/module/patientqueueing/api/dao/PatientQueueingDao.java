@@ -130,6 +130,7 @@ public class PatientQueueingDao {
 		}
 		
 		criteria.add(Restrictions.ne("status", PatientQueue.Status.COMPLETED));
+		criteria.add(Restrictions.eq("voided", false));
 		
 		return (PatientQueue) criteria.uniqueResult();
 	}
@@ -141,6 +142,7 @@ public class PatientQueueingDao {
 		Criteria criteria = getSession().createCriteria(PatientQueue.class);
 		
 		criteria.add(Restrictions.eq("patient", patient));
+		criteria.add(Restrictions.eq("voided", false));
 		criteria.addOrder(Order.desc("dateCreated"));
 		criteria.setMaxResults(1);
 		
@@ -181,6 +183,7 @@ public class PatientQueueingDao {
 			criteria.add(Restrictions.eq("queueRoom", queueRoom));
 		}
 		
+		criteria.add(Restrictions.eq("voided", false));
 		criteria.addOrder(Order.desc("dateCreated"));
 		
 		return criteria.list();
@@ -221,6 +224,7 @@ public class PatientQueueingDao {
 		}
 		
 		criteria.add(Restrictions.eq("visitNumber", visitNumber));
+		criteria.add(Restrictions.eq("voided", false));
 		
 		criteria.addOrder(Order.desc("dateCreated"));
 		
@@ -280,6 +284,7 @@ public class PatientQueueingDao {
 		if (queueRooms != null) {
 			criteria.add(Restrictions.in("queueRoom", queueRooms));
 		}
+		criteria.add(Restrictions.eq("voided", false));
 		
 		criteria.addOrder(Order.asc("dateCreated"));
 		return criteria.list();
@@ -328,6 +333,7 @@ public class PatientQueueingDao {
 			criteria.add(Restrictions.between("dateCreated", fromDate, toDate));
 		}
 		
+		criteria.add(Restrictions.eq("voided", false));
 		criteria.addOrder(Order.desc("dateCreated"));
 		
 		return criteria.list();
@@ -556,7 +562,7 @@ public class PatientQueueingDao {
 	 */
 	public Long countNonPatientQueuesToday(Date fromDate, Date toDate) {
 		String hql = "SELECT COUNT(npq.nonPatientQueueId) FROM patientqueueing.NonPatientQueue npq "
-		        + "WHERE npq.dateCreated BETWEEN :fromDate AND :toDate";
+		        + "WHERE npq.dateCreated BETWEEN :fromDate AND :toDate AND npq.voided = false";
 		
 		org.hibernate.Query query = getSession().createQuery(hql);
 		query.setParameter("fromDate", fromDate);

@@ -148,8 +148,12 @@ public class SelfCheckInPatientResource extends DelegatingCrudResource<SelfCheck
 	}
 	
 	/**
-	 * Ensure patient has an active visit. If an active visit exists, reject check-in and ask to go
-	 * to reception. Otherwise, start a new visit using configured visit type.
+	 * Ensure patient has an active visit. Reuses existing active visit or creates a new one. This
+	 * aligns with CheckInResource policy for consistency.
+	 * 
+	 * @param patient the patient
+	 * @param location the location for the visit
+	 * @return the visit (existing or newly created), or null if visit creation is disabled
 	 */
 	private Visit ensurePatientVisit(Patient patient, Location location) {
 		try {
@@ -165,16 +169,15 @@ public class SelfCheckInPatientResource extends DelegatingCrudResource<SelfCheck
 			
 			VisitService visitService = Context.getVisitService();
 			
-			// Check for active visits - if any exist, reject the check-in
+			// Check for active visits - reuse if exists
 			List<Visit> activeVisits = visitService.getActiveVisitsByPatient(patient);
 			if (activeVisits != null && !activeVisits.isEmpty()) {
 				log.info("Patient " + patient.getPatientId() + " has " + activeVisits.size()
-				        + " active visit(s). Rejecting self check-in and asking to go to reception.");
-				throw new IllegalArgumentException(
-				        "You already have an active visit. Please go to the reception for assistance.");
+				        + " active visit(s). Reusing existing visit " + activeVisits.get(0).getUuid());
+				return activeVisits.get(0);
 			}
 			
-			// Start a new visit using the configured visit type
+			// Create a new visit using the configured visit type
 			VisitType visitType = Context.getVisitService().getVisitTypeByUuid(visitTypeUuid);
 			if (visitType == null) {
 				log.error("Configured visit type not found: " + visitTypeUuid);
@@ -255,7 +258,10 @@ public class SelfCheckInPatientResource extends DelegatingCrudResource<SelfCheck
 		String visitNumber = service.generateVisitNumber(locationTo, patient);
 		patientQueue.setVisitNumber(visitNumber);
 		
-		// Start a new visit for the patient
+		// Start a new visit for the patient (or reuse existing active visit)
+		// NOTE: Visit and queue are saved in separate transactions. If savePatientQue fails
+		// after ensurePatientVisit succeeds, the visit will be orphaned. A proper fix would
+		// require transactional wrapping (e.g., @Transactional on service layer).
 		Visit visit = ensurePatientVisit(patient, locationTo);
 		
 		// Save the queue entry
