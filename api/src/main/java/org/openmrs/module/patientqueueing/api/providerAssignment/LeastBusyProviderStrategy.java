@@ -29,7 +29,16 @@ public class LeastBusyProviderStrategy implements ProviderAssignmentStrategy {
 	private final PatientQueueingService queueingService;
 	
 	public LeastBusyProviderStrategy() {
-		this.queueingService = Context.getService(PatientQueueingService.class);
+		this(Context.getService(PatientQueueingService.class));
+	}
+	
+	/**
+	 * Constructor for dependency injection (useful for testing)
+	 * 
+	 * @param queueingService the patient queueing service
+	 */
+	public LeastBusyProviderStrategy(PatientQueueingService queueingService) {
+		this.queueingService = queueingService;
 	}
 	
 	@Override
