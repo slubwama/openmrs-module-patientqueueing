@@ -326,7 +326,8 @@ public class QueueKioskResource extends DelegatingCrudResource<SimpleObject> {
 			SimpleObject result = new SimpleObject();
 			result.put("ticketNumber", entry.getTicketNumber());
 			result.put("status", entry.getStatus());
-			result.put("displayName", entry.getDisplayName());
+			// Privacy: Mask patient name for kiosk display
+			result.put("displayName", maskPatientName(entry.getDisplayName()));
 			result.put("dateCreated", entry.getDateCreated());
 			return new NeedsPaging<SimpleObject>(Collections.singletonList(result), context);
 		}
@@ -597,7 +598,10 @@ public class QueueKioskResource extends DelegatingCrudResource<SimpleObject> {
 		// Add nested objects like UgandaEMR
 		status.put("locationTo", createLocationRef(pq.getLocationTo()));
 		status.put("queueRoom", createLocationRef(pq.getQueueRoom()));
-		status.put("displayName", pq.getPatient() != null ? pq.getPatient().getPersonName().getFullName() : null);
+		// Privacy: Mask patient name for kiosk display (e.g., "John Doe" → "J. D***")
+		String fullName = pq.getPatient() != null && pq.getPatient().getPersonName() != null ? pq.getPatient()
+		        .getPersonName().getFullName() : null;
+		status.put("displayName", maskPatientName(fullName));
 		status.put("queueType", "PATIENT");
 		
 		// Add queue position information for waiting patients using cached stats
