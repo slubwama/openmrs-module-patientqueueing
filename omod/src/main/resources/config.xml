@@ -67,19 +67,6 @@
 		<description>Visit type UUID to use when creating visits for patient self check-in (e.g., OPD visit type UUID). Leave empty to skip visit creation.</description>
 	</globalProperty>
 
-
-	<globalProperty>
-			<property>patientqueueing.kioskLocationTagUuid</property>
-			<defaultValue></defaultValue>
-			<description>Location tag UUID for kiosk check-ins. Only locations with this tag will be available for kiosk check-in. Load is balanced across all locations with this tag.</description>
-		</globalProperty>
-
-	<globalProperty>
-			<property>patientqueueing.receptionLocationTagUuid</property>
-			<defaultValue></defaultValue>
-			<description>Location tag UUID for reception check-ins. Only locations with this tag will be available for reception check-in. Load is balanced across all locations with this tag.</description>
-		</globalProperty>
-
 	<globalProperty>
 		<property>patientqueueing.estimatedWaitMinutesPerPerson</property>
 		<defaultValue>5</defaultValue>
