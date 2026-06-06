@@ -45,6 +45,7 @@ public class PatientQueueResource extends DelegatingCrudResource<PatientQueue> {
 	}
 	
 	@Override
+	@Authorized("Task: patientqueueing.viewQueue")
 	public PatientQueue getByUniqueId(String uniqueId) {
 		PatientQueue patientQueue = null;
 		Integer id = null;
@@ -102,6 +103,7 @@ public class PatientQueueResource extends DelegatingCrudResource<PatientQueue> {
 	}
 	
 	@Override
+	@Authorized("Task: patientqueueing.viewQueue")
 	public NeedsPaging<PatientQueue> doGetAll(RequestContext context) throws ResponseException {
 		return new NeedsPaging<PatientQueue>(new ArrayList<PatientQueue>(Context.getService(PatientQueueingService.class)
 		        .getPatientQueueList(null, null, null, null, null, null, null)), context);

@@ -10,6 +10,7 @@
 package org.openmrs.module.patientqueueing.web.resource;
 
 import org.openmrs.Location;
+import org.openmrs.api.annotation.Authorized;
 import org.openmrs.api.context.Context;
 import org.openmrs.module.patientqueueing.api.PatientQueueingService;
 import org.openmrs.module.patientqueueing.customdto.QueueDisplayContextDto;
@@ -86,6 +87,7 @@ public class QueueDisplayResource extends DelegatingCrudResource<QueueDisplayDto
 	 * OpenMRS REST routes GET with query params here. Example: /display?type=facility&uuid=...
 	 */
 	@Override
+	@Authorized("Task: patientqueueing.viewQueue")
 	protected PageableResult doSearch(RequestContext context) throws ResponseException {
 		// We return a "single result" list so REST is happy with pageable results.
 		// Clients can read results[0], but to keep payload shape identical to your DTO,
@@ -102,6 +104,7 @@ public class QueueDisplayResource extends DelegatingCrudResource<QueueDisplayDto
 	 * either throw or behave like doSearch.
 	 */
 	@Override
+	@Authorized("Task: patientqueueing.viewQueue")
 	public PageableResult doGetAll(RequestContext context) throws ResponseException {
 		// If no uuid, reject (prevents confusing "all displays for all facilities" behavior).
 		String uuid = context.getParameter("uuid");

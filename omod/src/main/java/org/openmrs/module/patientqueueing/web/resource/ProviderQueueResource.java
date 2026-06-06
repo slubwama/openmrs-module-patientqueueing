@@ -11,6 +11,7 @@ package org.openmrs.module.patientqueueing.web.resource;
 
 import org.openmrs.Location;
 import org.openmrs.api.LocationService;
+import org.openmrs.api.annotation.Authorized;
 import org.openmrs.api.context.Context;
 import org.openmrs.module.patientqueueing.api.PatientQueueingService;
 import org.openmrs.module.patientqueueing.web.customdto.ProviderQueueEntry;
@@ -61,6 +62,7 @@ public class ProviderQueueResource extends DelegatingCrudResource<ProviderQueueE
 	}
 	
 	@Override
+	@Authorized("Task: patientqueueing.manageQueue")
 	public ProviderQueueEntry save(ProviderQueueEntry delegate) {
 		if (delegate.getUuid() == null || delegate.getUuid().trim().isEmpty()) {
 			throw new IllegalArgumentException("uuid is required");
@@ -87,6 +89,7 @@ public class ProviderQueueResource extends DelegatingCrudResource<ProviderQueueE
 	}
 	
 	@Override
+	@Authorized("Task: patientqueueing.viewQueue")
 	public ProviderQueueEntry getByUniqueId(String uniqueId) {
 		PatientQueue patientQueue = patientQueueingService().getPatientQueueByUuid(uniqueId);
 		if (patientQueue != null) {
