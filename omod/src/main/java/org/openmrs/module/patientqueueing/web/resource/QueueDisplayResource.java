@@ -10,7 +10,7 @@
 package org.openmrs.module.patientqueueing.web.resource;
 
 import org.openmrs.Location;
-import org.openmrs.api.annotation.Authorized;
+import org.openmrs.annotation.Authorized;
 import org.openmrs.api.context.Context;
 import org.openmrs.module.patientqueueing.api.PatientQueueingService;
 import org.openmrs.module.patientqueueing.customdto.QueueDisplayContextDto;
