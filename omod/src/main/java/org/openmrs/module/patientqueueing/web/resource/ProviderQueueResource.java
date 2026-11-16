@@ -17,6 +17,7 @@ import org.openmrs.module.patientqueueing.api.PatientQueueingService;
 import org.openmrs.module.patientqueueing.web.customdto.ProviderQueueEntry;
 import org.openmrs.module.patientqueueing.model.NonPatientQueue;
 import org.openmrs.module.patientqueueing.model.PatientQueue;
+import org.openmrs.module.webservices.rest.SimpleObject;
 import org.openmrs.module.webservices.rest.web.RequestContext;
 import org.openmrs.module.webservices.rest.web.annotation.Resource;
 import org.openmrs.module.webservices.rest.web.RestConstants;
@@ -87,6 +88,17 @@ public class ProviderQueueResource extends DelegatingCrudResource<ProviderQueueE
 		} else {
 			return updateNonPatientQueue(delegate);
 		}
+	}
+	
+	@Override
+	public Object update(String uuid, SimpleObject propertiesToUpdate, RequestContext context) throws ResponseException {
+		// The delegate is built from the entry, so its locationToUuid and queueRoomUuid start as the
+		// entry's own; a FORWARD has to name its destination in the request
+		if ("FORWARD".equalsIgnoreCase((String) propertiesToUpdate.get("action"))) {
+			requireLocation((String) propertiesToUpdate.get("locationToUuid"), "locationToUuid");
+			requireLocation((String) propertiesToUpdate.get("queueRoomUuid"), "queueRoomUuid");
+		}
+		return super.update(uuid, propertiesToUpdate, context);
 	}
 	
 	@Override
@@ -381,12 +393,12 @@ public class ProviderQueueResource extends DelegatingCrudResource<ProviderQueueE
 			pq.setComment(dto.getComment());
 		}
 		
-		patientQueueingService().savePatientQue(pq);
-		
-		// Route status changes through the service transition methods so their rules are enforced
+		// Route status changes through the service transition methods so their rules are enforced,
+		// before saving, so a refused change leaves the other edits unsaved too
 		if (dto.getStatus() != null) {
 			pq = applyPatientQueueTransition(pq, toPatientQueueStatus(dto.getStatus()));
 		}
+		patientQueueingService().savePatientQue(pq);
 		return toDto(pq);
 	}
 	
@@ -452,12 +464,12 @@ public class ProviderQueueResource extends DelegatingCrudResource<ProviderQueueE
 			npq.setComment(dto.getComment());
 		}
 		
-		patientQueueingService().saveNonPatientQueue(npq);
-		
-		// Route status changes through the service transition methods so their rules are enforced
+		// Route status changes through the service transition methods so their rules are enforced,
+		// before saving, so a refused change leaves the other edits unsaved too
 		if (dto.getStatus() != null) {
 			npq = applyNonPatientQueueTransition(npq, toNonPatientQueueStatus(dto.getStatus()));
 		}
+		patientQueueingService().saveNonPatientQueue(npq);
 		return toDto(npq);
 	}
 	

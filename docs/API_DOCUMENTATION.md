@@ -509,7 +509,7 @@ OpenMRS REST takes updates as **POST** to the resource's uuid (`PUT …/<uuid>` 
 - `status` accepts `WAITING` (skip back to waiting), `CALLED`, `ARRIVED` (non-patient only,
   between CALLED and IN_SERVICE), `IN_SERVICE`, `HOLD`, `NO_SHOW`, `CANCELLED` (non-patient
   only) and `COMPLETED`. Transitions that are illegal from the entry's current status are
-  rejected with 400 — e.g. calling a transferred entry, or serving a ticket that is only
+  rejected with 500 — e.g. calling a transferred entry, or serving a ticket that is only
   CALLED (non-patient tickets must be marked ARRIVED first).
 - `sourceType`: `PATIENT_QUEUE` for patient entries; omit for non-patient entries. Only
   needed when the uuid alone cannot disambiguate.
@@ -528,7 +528,10 @@ curl -X POST -H 'Content-Type: application/json' \
 **Endpoint**: `POST /ws/rest/v1/patientqueueing/providerqueuebylocation/:uuid`
 
 Send `action: "FORWARD"` with the destination: the current entry is closed as TRANSFERRED
-(keeping its source room for history) and a new entry is created at the destination.
+(keeping its source room for history) and a new entry is created at the destination. Both
+`locationToUuid` and `queueRoomUuid` must name the destination in the request — the request
+body is overlaid on the entry, so omitting them would reuse the source room and misroute
+the patient.
 
 **Request Body**:
 ```json

@@ -16,6 +16,7 @@ import org.openmrs.module.webservices.rest.SimpleObject;
 import org.openmrs.module.webservices.rest.web.ConversionUtil;
 import org.openmrs.module.webservices.rest.web.RequestContext;
 import org.openmrs.module.webservices.rest.web.RestConstants;
+import org.openmrs.module.webservices.rest.web.annotation.PropertySetter;
 import org.openmrs.module.webservices.rest.web.annotation.Resource;
 import org.openmrs.module.webservices.rest.web.api.RestService;
 import org.openmrs.module.webservices.rest.web.representation.DefaultRepresentation;
@@ -39,6 +40,9 @@ import java.util.Map;
 
 @Resource(name = RestConstants.VERSION_1 + "/patientqueue", supportedClass = PatientQueue.class, supportedOpenmrsVersions = { "1.9.* - 9.*" })
 public class PatientQueueResource extends DelegatingCrudResource<PatientQueue> {
+	
+	private static final List<PatientQueue.Status> DASHBOARD_ONLY = Arrays.asList(PatientQueue.Status.ON_HOLD,
+	    PatientQueue.Status.NO_SHOW, PatientQueue.Status.TRANSFERRED);
 	
 	@Override
 	public PatientQueue newDelegate() {
@@ -108,6 +112,19 @@ public class PatientQueueResource extends DelegatingCrudResource<PatientQueue> {
 		patientQueueResource.setConvertedProperties(patientQueue, propertiesToUpdate,
 		    patientQueueResource.getUpdatableProperties(), false);
 		return patientQueue;
+	}
+	
+	// Create and update both set the status through here; hold, no-show and transfer carry
+	// transition rules and need manageQueue, so moves into or out of them go through
+	// providerqueuebylocation
+	@PropertySetter("status")
+	public static void setStatus(PatientQueue delegate, PatientQueue.Status status) {
+		PatientQueue.Status from = delegate.getStatus();
+		if (from != status && (DASHBOARD_ONLY.contains(from) || DASHBOARD_ONLY.contains(status))) {
+			throw new ResourceDoesNotSupportOperationException(
+			        "Use patientqueueing/providerqueuebylocation to move a queue entry from " + from + " to " + status);
+		}
+		delegate.setStatus(status);
 	}
 	
 	@Override
@@ -269,7 +286,9 @@ public class PatientQueueResource extends DelegatingCrudResource<PatientQueue> {
 		if (activeOnly && PatientQueuesByQuery != null && queueStatus != PatientQueue.Status.COMPLETED) {
 			List<PatientQueue> filtered = new java.util.ArrayList<PatientQueue>();
 			for (PatientQueue queue : PatientQueuesByQuery) {
-				if (queue.getStatus() != PatientQueue.Status.COMPLETED) {
+				// TRANSFERRED rows belong to the room the patient left, not the active queue here
+				if (queue.getStatus() != PatientQueue.Status.COMPLETED
+				        && queue.getStatus() != PatientQueue.Status.TRANSFERRED) {
 					filtered.add(queue);
 				}
 			}

@@ -750,7 +750,9 @@ public class QueueKioskResource extends DelegatingCrudResource<SimpleObject> {
 				if (isWaiting) {
 					String uuid = (String) serviceInfo.get("uuid");
 					String type = (String) serviceInfo.get("type");
-					Location queueRoom = (Location) serviceInfo.get("queueRoom");
+					// serviceInfo no longer carries queueRoom (removed above), so read it off the entry
+					Location queueRoom = "PATIENT".equals(type) ? patientQueueMap.get(uuid).getQueueRoom()
+					        : nonPatientQueueMap.get(uuid).getQueueRoom();
 
 					if (queueRoom != null && statsMap != null) {
 						QueueRoomStats stats = statsMap.get(queueRoom);
