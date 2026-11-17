@@ -486,7 +486,12 @@ public class PatientQueueingDao {
 			criteria.add(Restrictions.eq("queueType", queueType));
 		}
 		
-		if (locations != null && !locations.isEmpty()) {
+		if (locations != null) {
+			// An empty location list means "no matches", not "no filter", mirroring the
+			// patient-queue queries
+			if (locations.isEmpty()) {
+				return java.util.Collections.emptyList();
+			}
 			criteria.add(Restrictions.in("locationTo", locations));
 		}
 		

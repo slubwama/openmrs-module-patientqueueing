@@ -316,7 +316,7 @@
         <insert tableName="privilege">
             <column name="privilege" value="Task: patientqueueing.viewQueue"/>
             <column name="description" value="Ability to view queue status and entries"/>
-            <column name="uuid" value="8a41c7d2-6f5b-4a2e-9c30-1f4b8d6e5a01"/>
+            <column name="uuid" value="eebcc9a1-0a2c-4adc-bd7b-568021f2dee2"/>
         </insert>
     </changeSet>
 
@@ -327,7 +327,7 @@
         <insert tableName="privilege">
             <column name="privilege" value="Task: patientqueueing.manageQueue"/>
             <column name="description" value="Ability to manage queue entries (pick, call, hold, recall, skip, no-show, transfer, complete)"/>
-            <column name="uuid" value="8a41c7d2-6f5b-4a2e-9c30-1f4b8d6e5a02"/>
+            <column name="uuid" value="1a6406d2-a0cb-4ac8-91d0-59411153df62"/>
         </insert>
     </changeSet>
 
