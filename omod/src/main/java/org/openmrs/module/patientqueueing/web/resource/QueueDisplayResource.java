@@ -304,7 +304,9 @@ public class QueueDisplayResource extends DelegatingCrudResource<QueueDisplayDto
 		row.setTicketNumber(ticket);
 		
 		row.setStatus(pq.getStatus() != null ? pq.getStatus().name() : null);
-		row.setDisplayName(pq.getDisplayName());
+		// Privacy: mask non-patient display names too — self-typed personal data on the same
+		// public screen where patient names are already masked
+		row.setDisplayName(QueueNameMaskUtil.maskPatientName(pq.getDisplayName()));
 		row.setQueueLocation(pq.getLocationTo() != null ? pq.getLocationTo().getName() : null);
 		row.setServiceLocation(pq.getQueueRoom() != null ? pq.getQueueRoom().getName() : null);
 		row.setDateCreated(pq.getDateCreated());
@@ -337,12 +339,17 @@ public class QueueDisplayResource extends DelegatingCrudResource<QueueDisplayDto
 			target = new Date();
 		} else {
 			try {
-				// Documented format: date=today|YYYY-MM-DD
-				target = new SimpleDateFormat("yyyy-MM-dd").parse(dateParam.trim());
+				// Documented format: date=today|YYYY-MM-DD; strict parsing so 2026-13-99
+				// is rejected instead of silently rolling over into another month
+				SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd");
+				format.setLenient(false);
+				target = format.parse(dateParam.trim());
 			}
 			catch (ParseException e) {
-				log.warn("Unparseable date parameter '" + dateParam + "', defaulting to today");
-				target = new Date();
+				// Reject rather than silently showing today: a public display falling back to the
+				// wrong day looks like a working feed showing stale data
+				throw new UnsupportedOperationException("Invalid date parameter '" + dateParam
+				        + "': expected today or YYYY-MM-DD");
 			}
 		}
 		return new DateRange(OpenmrsUtil.firstSecondOfDay(target), OpenmrsUtil.getLastMomentOfDay(target));

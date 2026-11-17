@@ -263,7 +263,8 @@ public class ProviderAssignmentServiceImpl extends BaseOpenmrsService implements
 
 			int activeCount = 0;
 			for (PatientQueue queue : queues) {
-				if (queue.getStatus() != PatientQueue.Status.COMPLETED) {
+				if (queue.getStatus() != PatientQueue.Status.COMPLETED
+				        && queue.getStatus() != PatientQueue.Status.TRANSFERRED) {
 					activeCount++;
 				}
 			}

@@ -19,8 +19,14 @@ import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
 import org.openmrs.Location;
 import org.openmrs.Patient;
+import org.openmrs.Person;
+import org.openmrs.PersonName;
+import org.openmrs.Privilege;
 import org.openmrs.Provider;
+import org.openmrs.Role;
+import org.openmrs.User;
 import org.openmrs.api.APIException;
+import org.openmrs.api.UserService;
 import org.openmrs.api.context.Context;
 import org.openmrs.module.patientqueueing.api.dao.PatientQueueingDao;
 import org.openmrs.module.patientqueueing.api.impl.PatientQueueingServiceImpl;
@@ -887,5 +893,105 @@ public class PatientQueueingServiceTest extends BaseModuleContextSensitiveTest {
 		Assert.assertEquals(roomA.getUuid(), npq.getLocationTo().getUuid());
 		Assert.assertEquals(NonPatientQueue.NonPatientQueueStatus.WAITING, transferred.getStatus());
 		Assert.assertEquals(roomB.getUuid(), transferred.getLocationTo().getUuid());
+	}
+	
+	// ===== Authorization enforcement (assert actual failures, not annotations) =====
+	
+	/**
+	 * Creates a fresh role holding exactly the given privileges and authenticates as a new user
+	 * with only that role. Names are uniqued so tests stay independent regardless of run order.
+	 */
+	private void authenticateAsUserWithPrivileges(String... privilegeNames) {
+		UserService userService = Context.getUserService();
+		String suffix = Long.toString(System.nanoTime());
+		
+		Role role = new Role("queue privilege test role " + suffix, "Transient role for privilege tests");
+		for (String privilegeName : privilegeNames) {
+			role.addPrivilege(userService.savePrivilege(new Privilege(privilegeName, "Transient privilege for tests")));
+		}
+		userService.saveRole(role);
+		
+		User user = new User();
+		user.setPerson(new Person());
+		user.addName(new PersonName("Queue", null, "PrivilegeTest"));
+		user.getPerson().setGender("F");
+		user.setUsername("queueprivtest" + suffix);
+		user.addRole(role);
+		userService.createUser(user, "QueueTest123");
+		
+		Context.authenticate(user.getUsername(), "QueueTest123");
+	}
+	
+	private void assertPrivilegeRefused(Runnable serviceCall, String privilegeName) {
+		try {
+			serviceCall.run();
+			Assert.fail("Expected an authorization failure without " + privilegeName);
+		}
+		catch (APIException e) {
+			// The advice's message is the unlocalized "error.privilegesRequired" code in the test
+			// context (no message bundle loaded), so it never names the privilege — the refusal
+			// itself is the assertion
+		}
+	}
+	
+	@Test
+	public void getPatientQueueById_shouldRefuseWithoutViewQueuePrivilege() {
+		authenticateAsUserWithPrivileges();
+		
+		PatientQueueingService service = Context.getService(PatientQueueingService.class);
+		assertPrivilegeRefused(new Runnable() {
+			
+			@Override
+			public void run() {
+				service.getPatientQueueById(1);
+			}
+		}, "viewQueue");
+	}
+	
+	@Test
+	public void savePatientQue_shouldRefuseWithoutSendPatientToQueuePrivilege() {
+		authenticateAsUserWithPrivileges("Task: patientqueueing.viewQueue");
+		
+		PatientQueueingService service = Context.getService(PatientQueueingService.class);
+		assertPrivilegeRefused(new Runnable() {
+			
+			@Override
+			public void run() {
+				service.savePatientQue(new PatientQueue());
+			}
+		}, "sendPatientToQueue");
+	}
+	
+	@Test
+	public void pickPatientQueue_shouldRefuseReadOnlyUserWithoutManageQueuePrivilege() {
+		// Get Patients and Get Locations are needed only so the entry-setup helper can load
+		// patient 10000 and its queue room
+		authenticateAsUserWithPrivileges("Task: patientqueueing.viewQueue", "Get Patients", "Get Locations");
+		
+		final PatientQueueingService service = Context.getService(PatientQueueingService.class);
+		final PatientQueue entry = incompleteEntryForPatient10000(Context.getLocationService().getLocation(1));
+		assertPrivilegeRefused(new Runnable() {
+			
+			@Override
+			public void run() {
+				service.pickPatientQueue(entry, null, null);
+			}
+		}, "manageQueue");
+	}
+	
+	@Test
+	public void pickPatientQueue_shouldAllowUserWithManageQueuePrivilege() {
+		// Get Patients and Get Locations are needed only so the entry-setup helper can load
+		// patient 10000 and its queue room
+		authenticateAsUserWithPrivileges("Task: patientqueueing.viewQueue", "Task: patientqueueing.manageQueue",
+		    "Get Patients", "Get Locations");
+		
+		PatientQueueingService service = Context.getService(PatientQueueingService.class);
+		PatientQueue entry = incompleteEntryForPatient10000(Context.getLocationService().getLocation(1));
+		
+		// Positive control: the same call the read-only test refuses must succeed here,
+		// proving the refusal is about the privilege and not the setup
+		PatientQueue picked = service.pickPatientQueue(entry, null, null);
+		Assert.assertEquals(PatientQueue.Status.PICKED, picked.getStatus());
 	}
 }

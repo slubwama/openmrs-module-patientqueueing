@@ -207,8 +207,11 @@ public class SelfCheckInPatientResource extends DelegatingCrudResource<SelfCheck
 			throw e;
 		}
 		catch (Exception e) {
+			// Fail the check-in rather than proceeding without a visit — CheckInResource fails
+			// the check-in on visit trouble, and a silent visit-less entry hides the problem
+			// from reception entirely
 			log.error("Error ensuring patient visit: " + e.getMessage(), e);
-			return null;
+			throw new DAOException("Failed to create visit for patient - please check visit configuration", e);
 		}
 	}
 	
@@ -431,8 +434,14 @@ public class SelfCheckInPatientResource extends DelegatingCrudResource<SelfCheck
 			}
 		}
 		
-		log.warn("Identifier type UUID not found in configured types: " + identifierTypeUuid);
-		return null;
+		// The kiosk explicitly presented this identifier type: if it is not in either configured
+		// list, that is a configuration error. Silently returning null would fall through to the
+		// phone match or mint a non-patient ticket for a real patient, unlinking them from their
+		// record. A configured type that simply matches nobody still returns null and lets the
+		// phone path try.
+		log.error("Identifier type UUID not found in configured types: " + identifierTypeUuid);
+		throw new IllegalArgumentException(
+		        "Identifier type is not configured for self check-in. Please check in at reception.");
 	}
 	
 	/**

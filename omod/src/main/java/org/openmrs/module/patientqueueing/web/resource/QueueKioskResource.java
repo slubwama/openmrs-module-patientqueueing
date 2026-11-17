@@ -2,6 +2,7 @@ package org.openmrs.module.patientqueueing.web.resource;
 
 import org.openmrs.Location;
 import org.openmrs.Patient;
+import org.openmrs.annotation.Authorized;
 import org.openmrs.api.context.Context;
 import org.openmrs.module.patientqueueing.api.PatientQueueingService;
 import org.openmrs.module.patientqueueing.web.customdto.QueueEntry;
@@ -303,13 +304,20 @@ public class QueueKioskResource extends DelegatingCrudResource<SimpleObject> {
 	/**
 	 * REST routes GETs carrying any filter parameter here rather than to doGetAll, so all kiosk
 	 * lookups (?journey=, ?visitNumber=, ?ticketNumber=) must be handled in doSearch.
+	 * <p>
+	 * Both routes require Task: patientqueueing.viewQueue: the kiosk enumerates queue entries by
+	 * ticket number, so without the same privilege the queue itself needs, any authenticated user
+	 * could probe ticket numbers for other patients' queue positions. Kiosk devices authenticate
+	 * with a role holding viewQueue — roles holding the legacy privileges get it on upgrade.
 	 */
 	@Override
+	@Authorized("Task: patientqueueing.viewQueue")
 	protected PageableResult doSearch(RequestContext context) throws ResponseException {
 		return doGetAll(context);
 	}
 	
 	@Override
+	@Authorized("Task: patientqueueing.viewQueue")
 	public PageableResult doGetAll(RequestContext context) throws ResponseException {
 		// Check for journey endpoint request
 		String journeyParam = context.getParameter("journey");
@@ -542,7 +550,9 @@ public class QueueKioskResource extends DelegatingCrudResource<SimpleObject> {
 		status.put("dateCreated", formatDate(npq.getDateCreated()));
 		status.put("dateCompleted",
 		    npq.getStatus() == NonPatientQueue.NonPatientQueueStatus.COMPLETED ? formatDate(npq.getEndedAt()) : null);
-		status.put("displayName", npq.getDisplayName());
+		// Privacy: mask non-patient display names too — they are self-typed personal data on the
+		// same unattended screen, and patient names are already masked here
+		status.put("displayName", QueueNameMaskUtil.maskPatientName(npq.getDisplayName()));
 		status.put("queueType", "NON_PATIENT");
 		
 		// Add nested objects like UgandaEMR
@@ -790,7 +800,7 @@ public class QueueKioskResource extends DelegatingCrudResource<SimpleObject> {
 			// Security: Don't expose patientUuid in kiosk endpoint to prevent further patient data enumeration
 			journey.put("patientUuid", null);
 		} else if (!nonPatientQueues.isEmpty()) {
-			journey.put("displayName", nonPatientQueues.get(0).getDisplayName());
+			journey.put("displayName", QueueNameMaskUtil.maskPatientName(nonPatientQueues.get(0).getDisplayName()));
 			journey.put("patientUuid", null);
 		} else {
 			throw new IllegalArgumentException("No queue entry found for ticket number: " + ticketNumber);
