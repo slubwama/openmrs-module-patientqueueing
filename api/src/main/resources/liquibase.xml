@@ -302,4 +302,47 @@
             <column name="location_to"/>
         </createIndex>
     </changeSet>
+
+    <!-- Upgrade path: liquibase runs before config.xml creates privileges, so insert the two
+         new enforced privileges here first (config.xml skips privileges that already exist),
+         then grant them to roles that already hold the legacy queue privileges. Roles such as
+         UgandaEMR's Reception hold sendPatientToQueue/completePatientQueue and check patients
+         in through savePatientQue; without these grants they get 403 on viewQueue- and
+         manageQueue-protected endpoints after upgrading. -->
+    <changeSet author="slubwama" id="patientqueueing_view_queue_privilege-1">
+        <preConditions onFail="MARK_RAN">
+            <sqlCheck expectedResult="0">SELECT COUNT(*) FROM privilege WHERE privilege = 'Task: patientqueueing.viewQueue'</sqlCheck>
+        </preConditions>
+        <insert tableName="privilege">
+            <column name="privilege" value="Task: patientqueueing.viewQueue"/>
+            <column name="description" value="Ability to view queue status and entries"/>
+            <column name="uuid" value="8a41c7d2-6f5b-4a2e-9c30-1f4b8d6e5a01"/>
+        </insert>
+    </changeSet>
+
+    <changeSet author="slubwama" id="patientqueueing_manage_queue_privilege-1">
+        <preConditions onFail="MARK_RAN">
+            <sqlCheck expectedResult="0">SELECT COUNT(*) FROM privilege WHERE privilege = 'Task: patientqueueing.manageQueue'</sqlCheck>
+        </preConditions>
+        <insert tableName="privilege">
+            <column name="privilege" value="Task: patientqueueing.manageQueue"/>
+            <column name="description" value="Ability to manage queue entries (pick, call, hold, recall, skip, no-show, transfer, complete)"/>
+            <column name="uuid" value="8a41c7d2-6f5b-4a2e-9c30-1f4b8d6e5a02"/>
+        </insert>
+    </changeSet>
+
+    <changeSet author="slubwama" id="patientqueueing_grant_queue_privileges_on_upgrade-1">
+        <sql>
+            INSERT INTO role_privilege (role, privilege)
+            SELECT rp.role, p.new_privilege
+            FROM role_privilege rp
+            CROSS JOIN (SELECT 'Task: patientqueueing.viewQueue' AS new_privilege
+                        UNION
+                        SELECT 'Task: patientqueueing.manageQueue') p
+            WHERE rp.privilege IN ('Task: patientqueueing.sendPatientToQueue',
+                                   'Task: patientqueueing.completePatientQueue')
+              AND NOT EXISTS (SELECT 1 FROM role_privilege existing
+                              WHERE existing.role = rp.role AND existing.privilege = p.new_privilege)
+        </sql>
+    </changeSet>
 </databaseChangeLog>

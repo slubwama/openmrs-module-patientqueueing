@@ -70,7 +70,10 @@ public class ProviderQueueResource extends DelegatingCrudResource<ProviderQueueE
 			throw new IllegalArgumentException("uuid is required");
 		}
 		
-		Boolean isPatient = delegate.isPatient();
+		// getIsPatientQueue, not isPatient(): the boolean helper can never be null, so the
+		// sourceType fallback below would never run and an entry identified only by sourceType
+		// would silently take the non-patient path
+		Boolean isPatient = delegate.getIsPatientQueue();
 		if (isPatient == null && delegate.getSourceType() != null) {
 			isPatient = "PATIENT_QUEUE".equalsIgnoreCase(delegate.getSourceType());
 		}

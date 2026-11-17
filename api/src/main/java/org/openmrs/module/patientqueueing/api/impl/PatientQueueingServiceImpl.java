@@ -379,6 +379,10 @@ public class PatientQueueingServiceImpl extends BaseOpenmrsService implements Pa
 		}
 		
 		patientQueue.setStatus(PatientQueue.Status.PENDING);
+		// the entry goes back to waiting unclaimed: a PENDING row that still carries a provider
+		// keeps that provider busy for LeastBusyProviderStrategy and shows a provider on a
+		// nobody-is-serving entry on the dashboard
+		patientQueue.setProvider(null);
 		patientQueue.setDatePicked(null);
 		patientQueue.setDateCompleted(null);
 		patientQueue.setDateChanged(new Date());
@@ -580,9 +584,11 @@ public class PatientQueueingServiceImpl extends BaseOpenmrsService implements Pa
 		List<Location> queueRoomList = new ArrayList<>();
 		if (queueRoom != null) {
 			flattenLocationHierarchy(queueRoom, queueRoomList, queueRoomTag, true);
-			// If queueRoom was provided but has no matching tagged locations, return empty result
-			if (queueRoomList.isEmpty()) {
-				return Collections.emptyList();
+			// The room the caller named is always searched, tagged or not, so a queue room
+			// without the Room tag still returns its own tickets, matching the patient-queue
+			// queries that filter by queueRoom directly
+			if (!queueRoomList.contains(queueRoom)) {
+				queueRoomList.add(queueRoom);
 			}
 		}
 

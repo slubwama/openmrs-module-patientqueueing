@@ -518,7 +518,12 @@ public class PatientQueueingDao {
 		sb.append("AND pq.status = :status ");
 		sb.append("AND pq.voided = false ");
 		
-		if (locations != null && !locations.isEmpty()) {
+		if (locations != null) {
+			// An empty location list means "no matches", not "no filter", mirroring the
+			// patient-queue queries
+			if (locations.isEmpty()) {
+				return new java.util.HashMap<String, Integer>();
+			}
 			sb.append("AND pq.locationTo IN (:locations) ");
 		}
 		
@@ -600,7 +605,8 @@ public class PatientQueueingDao {
 		final String sql = "SELECT p.patient_id FROM person_attribute pa "
 		        + "INNER JOIN person_attribute_type pat ON pa.person_attribute_type_id = pat.person_attribute_type_id "
 		        + "INNER JOIN patient p ON pa.person_id = p.patient_id "
-		        + "WHERE pat.person_attribute_type_id = ? AND pa.value = ? " + "AND p.voided = 0 AND pa.voided = 0 LIMIT 1";
+		        + "WHERE pat.person_attribute_type_id = ? AND pa.value = ? AND pat.retired = 0 "
+		        + "AND p.voided = 0 AND pa.voided = 0 LIMIT 1";
 		
 		final Integer[] patientIdHolder = new Integer[1];
 		
@@ -663,7 +669,8 @@ public class PatientQueueingDao {
 		final String sql = "SELECT COUNT(DISTINCT p.patient_id) FROM person_attribute pa "
 		        + "INNER JOIN person_attribute_type pat ON pa.person_attribute_type_id = pat.person_attribute_type_id "
 		        + "INNER JOIN patient p ON pa.person_id = p.patient_id "
-		        + "WHERE pat.person_attribute_type_id = ? AND pa.value = ? AND p.voided = 0 AND pa.voided = 0";
+		        + "WHERE pat.person_attribute_type_id = ? AND pa.value = ? AND pat.retired = 0 "
+		        + "AND p.voided = 0 AND pa.voided = 0";
 		
 		final int[] countHolder = new int[1];
 		

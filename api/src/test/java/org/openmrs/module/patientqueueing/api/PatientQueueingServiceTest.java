@@ -754,6 +754,38 @@ public class PatientQueueingServiceTest extends BaseModuleContextSensitiveTest {
 		service.transferNonPatientQueue(npq, room, null);
 	}
 	
+	@Test(expected = APIException.class)
+	public void markNonPatientQueueArrived_shouldRefuseAWaitingEntry() {
+		PatientQueueingService service = Context.getService(PatientQueueingService.class);
+		Location room = Context.getLocationService().getLocation(10000);
+		service.markNonPatientQueueArrived(service.createNonPatientQueueEntry("Jane Doe", "+1234567890", null, room, room,
+		    room, 1, null));
+	}
+	
+	@Test(expected = APIException.class)
+	public void holdNonPatientQueue_shouldRefuseACancelledEntry() {
+		PatientQueueingService service = Context.getService(PatientQueueingService.class);
+		Location room = Context.getLocationService().getLocation(10000);
+		service.holdNonPatientQueue(service.cancelNonPatientQueue(service.createNonPatientQueueEntry("Jane Doe",
+		    "+1234567890", null, room, room, room, 1, null)));
+	}
+	
+	@Test(expected = APIException.class)
+	public void recallNonPatientQueue_shouldRefuseAWaitingEntry() {
+		PatientQueueingService service = Context.getService(PatientQueueingService.class);
+		Location room = Context.getLocationService().getLocation(10000);
+		service.recallNonPatientQueue(
+		    service.createNonPatientQueueEntry("Jane Doe", "+1234567890", null, room, room, room, 1, null), null);
+	}
+	
+	@Test(expected = APIException.class)
+	public void markNonPatientQueueNoShow_shouldRefuseAWaitingEntry() {
+		PatientQueueingService service = Context.getService(PatientQueueingService.class);
+		Location room = Context.getLocationService().getLocation(10000);
+		service.markNonPatientQueueNoShow(service.createNonPatientQueueEntry("Jane Doe", "+1234567890", null, room, room,
+		    room, 1, null));
+	}
+	
 	@Test
 	public void patientQueueTransitions_holdRecallNoShowAndReopen() {
 		PatientQueueingService service = Context.getService(PatientQueueingService.class);
@@ -772,6 +804,34 @@ public class PatientQueueingServiceTest extends BaseModuleContextSensitiveTest {
 		
 		entry = service.reopenPatientQueue(entry);
 		Assert.assertEquals(PatientQueue.Status.PENDING, entry.getStatus());
+		// a reopened entry is back to waiting unclaimed: a PENDING row carrying a provider would
+		// keep counting against that provider's LeastBusy load
+		Assert.assertNull(entry.getProvider());
+	}
+	
+	@Test
+	public void getNonPatientQueues_shouldReturnEntriesForANamedRoomWithoutTheRoomTag() {
+		PatientQueueingService service = Context.getService(PatientQueueingService.class);
+		Location room = Context.getLocationService().getLocation(10000);
+		service.createNonPatientQueueEntry("Jane Doe", "+1234567890", null, room, room, room, 1, null);
+		
+		// the room the caller named is always searched; only its hierarchy expansion cares about
+		// the Room tag, so a dashboard pointing at an untagged room must still see its tickets
+		List<NonPatientQueue> queues = service.getNonPatientQueues(null, null, null, room, null, null);
+		Assert.assertEquals(1, queues.size());
+	}
+	
+	@Test
+	public void countPendingQueuesByLocation_shouldReturnNoCountsForAnEmptyLocationList() {
+		PatientQueueingService service = Context.getService(PatientQueueingService.class);
+		Location room = Context.getLocationService().getLocation(10000);
+		service.createNonPatientQueueEntry("Jane Doe", "+1234567890", null, room, room, room, 1, null);
+		
+		// an empty location list means no matches, not facility-wide counts
+		java.util.Map<String, Integer> counts = service.countPendingQueuesByLocation(new java.util.ArrayList<Location>(),
+		    org.openmrs.util.OpenmrsUtil.firstSecondOfDay(new Date()),
+		    org.openmrs.util.OpenmrsUtil.getLastMomentOfDay(new Date()));
+		Assert.assertTrue(counts.isEmpty());
 	}
 	
 	@Test

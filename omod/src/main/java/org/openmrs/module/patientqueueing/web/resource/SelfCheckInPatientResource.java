@@ -495,11 +495,18 @@ public class SelfCheckInPatientResource extends DelegatingCrudResource<SelfCheck
 				return null;
 			}
 			
+			// Refuse to guess when the identifier is shared, the same way the phone-number and
+			// person-attribute paths do; picking one would queue the wrong patient's visit
 			if (identifiers.size() > 1) {
-				log.warn("Multiple patients found for identifier: " + identifierValue + " in type " + identifierTypeUuid);
+				throw new IllegalArgumentException("This identifier is shared by more than one patient. "
+				        + "Please check in with another identifier.");
 			}
 			
 			return identifiers.get(0).getPatient();
+		}
+		catch (IllegalArgumentException e) {
+			// shared-identifier refusal must reach the client, not be swallowed as "not found"
+			throw e;
 		}
 		catch (Exception e) {
 			log.error("Error finding patient by identifier type: " + identifierTypeUuid, e);

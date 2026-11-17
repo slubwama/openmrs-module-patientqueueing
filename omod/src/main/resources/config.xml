@@ -56,6 +56,12 @@
 	</globalProperty>
 
 	<globalProperty>
+		<property>patientqueueing.phoneNumberAttributeTypeUuid</property>
+		<defaultValue></defaultValue>
+		<description>Person attribute type UUID holding a patient's phone number, used to match a self check-in phone number to an existing patient (e.g., the Telephone Number attribute type). Leave empty to disable phone-based lookup. Must be configured per implementation as attribute type UUIDs differ between distributions.</description>
+	</globalProperty>
+
+	<globalProperty>
 		<property>patientqueueing.selfCheckInIdentifierTypeUuids</property>
 		<defaultValue></defaultValue>
 		<description>Comma-separated list of patient identifier type UUIDs to search during self check-in (e.g., Patient ID, National ID). Must be configured per implementation as identifier type UUIDs differ between distributions.</description>
@@ -89,6 +95,12 @@
 		<property>patientqueueing.autoAssignProvider</property>
 		<defaultValue>true</defaultValue>
 		<description>Whether check-in should automatically assign a provider using the configured assignment strategy. Set to false (or pass autoAssignProvider=false on the request) to always queue patients unassigned for manual assignment from the provider dashboard.</description>
+	</globalProperty>
+
+	<globalProperty>
+		<property>patientqueueing.providerAssignmentStrategy</property>
+		<defaultValue>leastBusy</defaultValue>
+		<description>Strategy used to pick a provider when check-in assigns one automatically: leastBusy (provider with the fewest active patients), roundRobin (rotate through the location's providers), random, or manual (always queue unassigned for the provider dashboard). Unknown values fall back to leastBusy.</description>
 	</globalProperty>
 
 	<globalProperty>
