@@ -379,10 +379,10 @@ public class PatientQueueingServiceImpl extends BaseOpenmrsService implements Pa
 		}
 		
 		patientQueue.setStatus(PatientQueue.Status.PENDING);
-		// the entry goes back to waiting unclaimed: a PENDING row that still carries a provider
-		// keeps that provider busy for LeastBusyProviderStrategy and shows a provider on a
-		// nobody-is-serving entry on the dashboard
-		patientQueue.setProvider(null);
+		// The provider stays: check-in auto-assignment intentionally leaves a provider on a
+		// PENDING row (LeastBusy counts it), and clearing it here would drop that assignment the
+		// first time a patient is recalled, so the next call has no provider and completion
+		// records nobody
 		patientQueue.setDatePicked(null);
 		patientQueue.setDateCompleted(null);
 		patientQueue.setDateChanged(new Date());

@@ -334,7 +334,7 @@
     <changeSet author="slubwama" id="patientqueueing_grant_queue_privileges_on_upgrade-1">
         <sql>
             INSERT INTO role_privilege (role, privilege)
-            SELECT rp.role, p.new_privilege
+            SELECT DISTINCT rp.role, p.new_privilege
             FROM role_privilege rp
             CROSS JOIN (SELECT 'Task: patientqueueing.viewQueue' AS new_privilege
                         UNION

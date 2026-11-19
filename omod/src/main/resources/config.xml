@@ -52,7 +52,7 @@
 	<globalProperty>
 		<property>patientqueueing.selfCheckInPersonAttributeTypeUuids</property>
 		<defaultValue></defaultValue>
-		<description>Person attribute type UUID for phone number lookup during self check-in (e.g., the Telephone Number attribute type). Must be configured per implementation as attribute type UUIDs differ between distributions. Leave empty to disable phone-based lookup.</description>
+		<description>Comma-separated person attribute type UUIDs a kiosk may send as identifierTypeUuid, to find the patient holding that attribute value (e.g., the Telephone Number attribute type). Must be configured per implementation as attribute type UUIDs differ between distributions. The phoneNumber field is matched through patientqueueing.phoneNumberAttributeTypeUuid instead.</description>
 	</globalProperty>
 
 	<globalProperty>

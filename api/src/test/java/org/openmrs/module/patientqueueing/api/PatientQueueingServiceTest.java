@@ -798,11 +798,13 @@ public class PatientQueueingServiceTest extends BaseModuleContextSensitiveTest {
 		Location roomA = Context.getLocationService().getLocation(1);
 		
 		PatientQueue entry = incompleteEntryForPatient10000(roomA);
+		Provider provider = Context.getProviderService().getProvider(1);
+		Assert.assertNotNull(provider);
 		
 		entry = service.holdPatientQueue(entry);
 		Assert.assertEquals(PatientQueue.Status.ON_HOLD, entry.getStatus());
 		
-		entry = service.recallPatientQueue(entry, null);
+		entry = service.recallPatientQueue(entry, provider);
 		Assert.assertEquals(PatientQueue.Status.PICKED, entry.getStatus());
 		
 		entry = service.markPatientQueueNoShow(entry);
@@ -810,15 +812,17 @@ public class PatientQueueingServiceTest extends BaseModuleContextSensitiveTest {
 		
 		entry = service.reopenPatientQueue(entry);
 		Assert.assertEquals(PatientQueue.Status.PENDING, entry.getStatus());
-		// a reopened entry is back to waiting unclaimed: a PENDING row carrying a provider would
-		// keep counting against that provider's LeastBusy load
-		Assert.assertNull(entry.getProvider());
+		// reopening must not drop the assignment: check-in leaves a provider on a PENDING row
+		// on purpose (LeastBusy counts it), so a recall that cleared it would leave the next
+		// call with no provider. Picking with one first makes this assertion bite.
+		Assert.assertNotNull(entry.getProvider());
 	}
 	
 	@Test
 	public void getNonPatientQueues_shouldReturnEntriesForANamedRoomWithoutTheRoomTag() {
 		PatientQueueingService service = Context.getService(PatientQueueingService.class);
-		Location room = Context.getLocationService().getLocation(10000);
+		// 10003 carries no Queue Room tag; 10000/10001/10002 do
+		Location room = Context.getLocationService().getLocation(10003);
 		service.createNonPatientQueueEntry("Jane Doe", "+1234567890", null, room, room, room, 1, null);
 		
 		// the room the caller named is always searched; only its hierarchy expansion cares about
@@ -830,8 +834,19 @@ public class PatientQueueingServiceTest extends BaseModuleContextSensitiveTest {
 	@Test
 	public void countPendingQueuesByLocation_shouldReturnNoCountsForAnEmptyLocationList() {
 		PatientQueueingService service = Context.getService(PatientQueueingService.class);
-		Location room = Context.getLocationService().getLocation(10000);
-		service.createNonPatientQueueEntry("Jane Doe", "+1234567890", null, room, room, room, 1, null);
+		Location room = Context.getLocationService().getLocation(1);
+		
+		// a pending PATIENT entry created today: without the empty-list guard (dropping the
+		// filter counts facility-wide), this entry would appear and the assertion below would
+		// fail — the earlier version of this test queued a non-patient ticket, which this
+		// patient-only count never sees, so it passed either way
+		PatientQueue pending = new PatientQueue();
+		pending.setPatient(Context.getPatientService().getPatient(10000));
+		pending.setLocationFrom(room);
+		pending.setLocationTo(room);
+		pending.setStatus(PatientQueue.Status.PENDING);
+		pending.setDateCreated(new Date());
+		service.savePatientQue(pending);
 		
 		// an empty location list means no matches, not facility-wide counts
 		java.util.Map<String, Integer> counts = service.countPendingQueuesByLocation(new java.util.ArrayList<Location>(),

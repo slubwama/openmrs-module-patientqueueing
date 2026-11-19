@@ -413,114 +413,80 @@ public class SelfCheckInPatientResource extends DelegatingCrudResource<SelfCheck
 			        "Self check-in is not configured. Please contact your system administrator to set up the required configurations.");
 		}
 		
-		// Check if it's a configured attribute type (person attribute like phone number)
-		if (parseUuidSet(personAttributeTypeUuidsStr).contains(identifierTypeUuid.trim())) {
-			log.info("Looking up patient by person attribute type: " + identifierTypeUuid);
-			// Look up only under the type the kiosk sent — searching every configured type
-			// would match a value held as a different attribute (e.g. a phone number stored
-			// as another patient's next-of-kin phone)
-			Patient patient = getPatientByPersonAttribute(identifierValue, identifierTypeUuid.trim());
-			if (patient != null) {
-				return patient;
+		String type = identifierTypeUuid.trim();
+		// Only a lookup that ran against a type that exists can answer "no patient"; a type that
+		// does not resolve is a configuration problem, and a lookup that fails reaches the client
+		// as itself rather than as a miss
+		boolean lookedUp = false;
+		if (parseUuidSet(personAttributeTypeUuidsStr).contains(type)) {
+			PersonAttributeType attributeType = Context.getPersonService().getPersonAttributeTypeByUuid(type);
+			if (attributeType != null && !attributeType.getRetired()) {
+				log.info("Looking up patient by person attribute type: " + type);
+				lookedUp = true;
+				Patient patient = getPatientByPersonAttribute(identifierValue, attributeType);
+				if (patient != null) {
+					return patient;
+				}
 			}
 		}
-		
-		// Check if it's a configured identifier type (patient identifier like National ID)
-		if (parseUuidSet(identifierTypeUuidsStr).contains(identifierTypeUuid.trim())) {
-			log.info("Looking up patient by identifier type: " + identifierTypeUuid);
-			Patient patient = getPatientByIdentifier(identifierValue, identifierTypeUuid);
-			if (patient != null) {
-				return patient;
+		if (parseUuidSet(identifierTypeUuidsStr).contains(type)) {
+			org.openmrs.PatientIdentifierType identifierType = Context.getPatientService().getPatientIdentifierTypeByUuid(
+			    type);
+			if (identifierType != null) {
+				log.info("Looking up patient by identifier type: " + type);
+				lookedUp = true;
+				Patient patient = getPatientByIdentifier(identifierValue, identifierType);
+				if (patient != null) {
+					return patient;
+				}
 			}
 		}
-		
-		// The kiosk explicitly presented this identifier type: if it is not in either configured
-		// list, that is a configuration error. Silently returning null would fall through to the
-		// phone match or mint a non-patient ticket for a real patient, unlinking them from their
-		// record. A configured type that simply matches nobody still returns null and lets the
-		// phone path try.
-		log.error("Identifier type UUID not found in configured types: " + identifierTypeUuid);
+		if (lookedUp) {
+			// refuse rather than fall back to the phone number, which may belong to someone else
+			log.info("No patient found for identifier value under configured type " + type);
+			throw new IllegalArgumentException("No patient found with that identifier. Please check in at reception.");
+		}
+		log.error("Identifier type UUID not configured for self check-in, or it no longer exists: " + type);
 		throw new IllegalArgumentException(
 		        "Identifier type is not configured for self check-in. Please check in at reception.");
 	}
 	
 	/**
 	 * Find patient by person attribute value under exactly one attribute type. Callers must pass
-	 * the type the client sent — searching other configured types here would match a value held as
-	 * a different attribute (e.g. a phone number stored as another patient's next-of-kin). Uses
-	 * efficient database queries instead of loading all patients into memory.
+	 * the resolved type the client sent — searching other configured types here would match a value
+	 * held as a different attribute (e.g. a phone number stored as another patient's next-of-kin).
+	 * Uses efficient database queries instead of loading all patients into memory.
 	 */
-	private Patient getPatientByPersonAttribute(String attributeValue, String attributeTypeUuid) {
-		try {
-			PatientQueueingService queueingService = Context.getService(PatientQueueingService.class);
-
-			PersonAttributeType attributeType = Context.getPersonService().getPersonAttributeTypeByUuid(attributeTypeUuid);
-			if (attributeType == null) {
-				log.warn("PersonAttributeType not found for UUID: " + attributeTypeUuid);
-				return null;
-			}
-
-			// Refuse to guess when the attribute value is shared by more than one patient
-			int matches = queueingService.countPatientsByPersonAttributeValue(attributeType.getPersonAttributeTypeId(),
-			    attributeValue);
-			if (matches > 1) {
-				throw new IllegalArgumentException("This " + attributeType.getName()
-				        + " is shared by more than one patient. Please check in with another identifier.");
-			}
-
-			// Use efficient database query instead of loading all patients
-			if (matches == 1) {
-				return queueingService.getPatientByPersonAttributeValue(attributeType.getPersonAttributeTypeId(),
-				    attributeValue);
-			}
-
-			return null;
+	private Patient getPatientByPersonAttribute(String attributeValue, PersonAttributeType attributeType) {
+		PatientQueueingService queueingService = Context.getService(PatientQueueingService.class);
+		
+		// Refuse to guess when the attribute value is shared by more than one patient
+		int matches = queueingService.countPatientsByPersonAttributeValue(attributeType.getPersonAttributeTypeId(),
+		    attributeValue);
+		if (matches > 1) {
+			throw new IllegalArgumentException("This " + attributeType.getName()
+			        + " is shared by more than one patient. Please check in with another identifier.");
 		}
-		catch (IllegalArgumentException | DAOException e) {
-			throw e;
-		}
-		catch (Exception e) {
-			log.error("Error finding patient by person attributes", e);
-			return null;
-		}
+		
+		return matches == 1 ? queueingService.getPatientByPersonAttributeValue(attributeType.getPersonAttributeTypeId(),
+		    attributeValue) : null;
 	}
 	
 	/**
-	 * Find patient by specific identifier type
+	 * Find patient by a specific resolved identifier type
 	 */
-	private Patient getPatientByIdentifier(String identifierValue, String identifierTypeUuid) {
-		try {
-			org.openmrs.PatientIdentifierType identifierType = Context.getPatientService().getPatientIdentifierTypeByUuid(
-			    identifierTypeUuid);
-			if (identifierType == null) {
-				log.warn("Patient identifier type not found for UUID: " + identifierTypeUuid);
-				return null;
-			}
-			
-			List<org.openmrs.PatientIdentifier> identifiers = Context.getPatientService().getPatientIdentifiers(
-			    identifierValue, Arrays.asList(identifierType), null, null, null);
-			
-			if (identifiers == null || identifiers.isEmpty()) {
-				return null;
-			}
-			
-			// Refuse to guess when the identifier is shared, the same way the phone-number and
-			// person-attribute paths do; picking one would queue the wrong patient's visit
-			if (identifiers.size() > 1) {
-				throw new IllegalArgumentException("This identifier is shared by more than one patient. "
-				        + "Please check in with another identifier.");
-			}
-			
-			return identifiers.get(0).getPatient();
+	private Patient getPatientByIdentifier(String identifierValue, org.openmrs.PatientIdentifierType identifierType) {
+		List<org.openmrs.PatientIdentifier> identifiers = Context.getPatientService().getPatientIdentifiers(identifierValue,
+		    Arrays.asList(identifierType), null, null, null);
+		
+		// Refuse to guess when the identifier is shared, the same way the phone-number and
+		// person-attribute paths do; picking one would queue the wrong patient's visit
+		if (identifiers.size() > 1) {
+			throw new IllegalArgumentException("This identifier is shared by more than one patient. "
+			        + "Please check in with another identifier.");
 		}
-		catch (IllegalArgumentException e) {
-			// shared-identifier refusal must reach the client, not be swallowed as "not found"
-			throw e;
-		}
-		catch (Exception e) {
-			log.error("Error finding patient by identifier type: " + identifierTypeUuid, e);
-			return null;
-		}
+		
+		return identifiers.isEmpty() ? null : identifiers.get(0).getPatient();
 	}
 	
 	private Integer parsePriority(Object priorityValue) {
