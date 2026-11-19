@@ -21,7 +21,7 @@
 
 Generic patient check-in with configurable visit type. Supports provider auto-assignment, queue position calculation, and estimated wait time.
 
-**Endpoint**: `POST /ws/rest/v1/patientqueueing/checkin` — **Requires**: `Task: patientqueueing.sendPatientToQueue` and `Task: patientqueueing.viewQueue` (enforced at the service layer); creating the visit additionally needs `Get Visits`, `Get Visit Types` and `Add Visits`
+**Endpoint**: `POST /ws/rest/v1/patientqueueing/checkin` — **Requires**: `Task: patientqueueing.sendPatientToQueue` and `Task: patientqueueing.viewQueue` (enforced at the service layer); creating the visit additionally needs `Get Visits`, `Get Visit Types`, `Get Visit Attribute Types` and `Add Visits` (the validator reads attribute types); auto-assignment additionally needs `Get Providers`; when `patientqueueing.providerLocationAttributeTypeUuid` is not set (or does not resolve), the fallback matches providers by user default location and additionally needs `Get Users` — if that privilege is missing (or no provider matches the location), the check-in still succeeds but the patient is queued unassigned
 
 **Parameters**:
 | Parameter | Type | Required | Description |
@@ -42,7 +42,7 @@ Generic patient check-in with configurable visit type. Supports provider auto-as
   "uuid": "queue-uuid",
   "ticketNumber": "21/04/2026-LOC-001",
   "status": "PENDING",
-  "dateCreated": "2026-04-21T10:30:00Z",
+  "dateCreated": 1776767400000,
   "queuePosition": 5,
   "estimatedWaitMinutes": 25,
   "success": true,
@@ -52,14 +52,14 @@ Generic patient check-in with configurable visit type. Supports provider auto-as
   },
   "visit": {
     "uuid": "visit-uuid",
-    "startDatetime": "2026-04-21T00:00:00Z",
+    "startDatetime": 1776729600000,
     "visitType": "OPD"
   },
   "queueEntry": {
     "uuid": "queue-uuid",
     "visitNumber": "21/04/2026-LOC-001",
     "status": "PENDING",
-    "dateCreated": "2026-04-21T10:30:00Z",
+    "dateCreated": 1776767400000,
     "provider": "provider-uuid-or-null"
   }
 }
@@ -81,7 +81,7 @@ curl -X POST -H 'Content-Type: application/json' \
 
 Self check-in endpoint for booth/kiosk scenarios. Simplified interface for self-service check-in.
 
-**Endpoint**: `POST /ws/rest/v1/patientqueueing/selfcheckin` — **Requires**: `Task: patientqueueing.sendPatientToQueue` when the kiosk identifies a patient, `Task: patientqueueing.checkIn` when it creates a non-patient ticket; visit creation additionally needs `Get Visits`, `Get Visit Types` and `Add Visits` when `patientqueueing.selfCheckInVisitTypeUuid` is set (see the README's kiosk device-account row)
+**Endpoint**: `POST /ws/rest/v1/patientqueueing/selfcheckin` — **Requires**: `Task: patientqueueing.sendPatientToQueue` when the kiosk identifies a patient, `Task: patientqueueing.checkIn` when it creates a non-patient ticket; visit creation additionally needs `Get Visits`, `Get Visit Types`, `Get Visit Attribute Types` and `Add Visits` when `patientqueueing.selfCheckInVisitTypeUuid` is set, and a `queueTypeUuid` on a non-patient ticket needs `Get Concepts` (see the README's kiosk device-account row)
 
 **Parameters**:
 | Parameter | Type | Required | Description |
@@ -109,7 +109,7 @@ curl -X POST -H 'Content-Type: application/json' \
 ```
 
 **Response**: depends on the outcome — `checkInType` tells them apart. There is no `success`
-field; validation and lookup problems surface as HTTP 400s with a message.
+field; validation and lookup problems surface as HTTP 500 with the reason in `error.message`.
 
 Patient match (identifier or phone resolved to a patient; `patient.display` is masked):
 ```json
@@ -120,7 +120,7 @@ Patient match (identifier or phone resolved to a patient; `patient.display` is m
     "uuid": "queue-uuid",
     "visitNumber": "21/04/2026-LOC-001",
     "status": "PENDING",
-    "dateCreated": "2026-04-21T10:30:00Z"
+    "dateCreated": 1776767400000
   },
   "patient": {
     "uuid": "patient-uuid",
@@ -128,7 +128,7 @@ Patient match (identifier or phone resolved to a patient; `patient.display` is m
   },
   "visit": {
     "uuid": "visit-uuid",
-    "startDatetime": "2026-04-21T00:00:00Z",
+    "startDatetime": 1776729600000,
     "stopDatetime": null,
     "visitType": "OPD"
   },
@@ -153,7 +153,7 @@ No patient identified (non-patient ticket):
     "phoneNumber": "+1234567890",
     "ticketNumber": "21/04/2026-LOC-TYPE-001",
     "status": "WAITING",
-    "dateCreated": "2026-04-21T10:30:00Z"
+    "dateCreated": 1776767400000
   }
 }
 ```
@@ -229,12 +229,12 @@ Look up a queue entry by ticket number. Searches both patient and non-patient qu
       "ticketNumber": "21/04/2026-LOC-001",
       "status": "PENDING",
       "displayName": "J. D***",
-      "dateCreated": "2026-04-21T10:30:00Z"
+      "dateCreated": "2026-04-21T10:30:00.000+0000"
     }
   ]
 }
 ```
-An unknown ticket number answers HTTP 400 with "No queue entry found for ticket number: ...".
+An unknown ticket number answers HTTP 500 with "No queue entry found for ticket number: ...".
 
 **Example**:
 ```bash
@@ -426,7 +426,7 @@ Get display data for public queue monitors, including "now serving" and "up next
       "displayName": "J. D***",
       "queueLocation": "Outpatient Clinic",
       "serviceLocation": "Room 1",
-      "dateCreated": "2026-04-21T10:30:00Z",
+      "dateCreated": 1776767400000,
       "priority": 1,
       "priorityScore": null,
       "priorityReason": null
@@ -440,7 +440,7 @@ Get display data for public queue monitors, including "now serving" and "up next
       "displayName": "J. S***",
       "queueLocation": "Outpatient Clinic",
       "serviceLocation": "Room 1",
-      "dateCreated": "2026-04-21T10:31:00Z",
+      "dateCreated": 1776767460000,
       "priority": null,
       "priorityScore": null,
       "priorityReason": null
@@ -451,7 +451,7 @@ Get display data for public queue monitors, including "now serving" and "up next
     "upNextCount": 4,
     "totalCount": 5
   },
-      "lastUpdated": "2026-04-21T10:50:00Z"
+      "lastUpdated": 1776768600000
     }
   ]
 }
@@ -467,7 +467,7 @@ curl -X GET \
 
 ### List All Non-Patient Queues
 
-**Requires**: `Task: patientqueueing.viewQueue`
+**Requires**: `Task: patientqueueing.viewQueue`; a `queueType` filter additionally needs `Get Concepts`
 
 **Endpoint**: `GET /ws/rest/v1/patientqueueing/nonpatientqueue`
 
@@ -526,7 +526,8 @@ curl -X GET \
 ```
 
 Same endpoint and request as [Non-Patient Check-in](#non-patient-check-in), which holds the
-full request/response documentation. **Requires**: `Task: patientqueueing.checkIn`.
+full request/response documentation. **Requires**: `Task: patientqueueing.checkIn`; a
+`queueTypeUuid` additionally needs `Get Concepts`.
 
 ### Update Non-Patient Queue
 
@@ -554,6 +555,8 @@ curl -X POST -H 'Content-Type: application/json' \
 ```
 
 ### Search Non-Patient Queues
+
+**Requires**: `Task: patientqueueing.viewQueue`; a `queueType` filter additionally needs `Get Concepts`
 
 **Endpoint**: `GET /ws/rest/v1/patientqueueing/nonpatientqueue?q=search`
 
@@ -599,7 +602,7 @@ enforced by the service's transition rules.
 **Response**: paged list of `ProviderQueueEntry` under the standard `results` envelope (patient and non-patient entries merged,
 sorted by status, then priority high-to-low, then FIFO). Each entry carries:
 `uuid`, `queueNumber`, `displayName`, `identifiedBy`, `currentLocation`, `serviceLocation`,
-`status`, `priority`, `dateCreated`, `patient`, `sourceType` (`PATIENT_QUEUE` or null),
+`status`, `priority`, `dateCreated`, `patient`, `sourceType` (`PATIENT_QUEUE` or `NON_PATIENT_QUEUE`),
 `locationToUuid`, `queueRoomUuid`, `comment`, `action`.
 
 **Returned status values**: `WAITING`, `CALLED`, `ARRIVED`, `IN_SERVICE`, `HOLD`, `NO_SHOW`,
@@ -629,7 +632,7 @@ OpenMRS REST takes updates as **POST** to the resource's uuid (`PUT …/<uuid>` 
   only) and `COMPLETED`. Transitions that are illegal from the entry's current status are
   rejected with 500 — e.g. calling a transferred entry, or serving a ticket that is only
   CALLED (non-patient tickets must be marked ARRIVED first).
-- `sourceType`: `PATIENT_QUEUE` for patient entries; omit for non-patient entries. Only
+- `sourceType`: `PATIENT_QUEUE` for patient entries; `NON_PATIENT_QUEUE` or omitted for non-patient entries. Only
   needed when the uuid alone cannot disambiguate.
 
 **Requires**: `Task: patientqueueing.manageQueue`
@@ -747,16 +750,24 @@ Non-patient queue entry.
 
 ## Error Responses
 
-### Validation Error (400)
+### Self-checked problem (HTTP 500)
+
+The check-in, kiosk and self check-in resources answer the problems they check themselves with
+HTTP 500 and the reason in the message — not 400:
 
 ```json
 {
   "error": {
-    "message": "patient parameter is required",
-    "code": "validation.error"
+    "message": "[patient is required]",
+    "code": "CheckInResource:414",
+    "detail": {},
+    "rawMessage": "patient is required",
+    "translatedMessage": "patient is required"
   }
 }
 ```
+The `message` wraps the reason in brackets and `code` names the throwing class and line; prefer
+`rawMessage`/`translatedMessage` when displaying it.
 
 ### Not Found (404)
 
@@ -838,13 +849,14 @@ No rate limiting is currently enforced. Clients should implement reasonable poll
 
 ## Best Practices
 
-1. **Always handle errors**: `/patientqueueing/checkin` carries a `success` field; the other resources surface errors as HTTP 400/404 with a message
-2. **Use polling for displays**: Don't poll more frequently than every 5 seconds
-3. **Filter by location**: Always provide location/queueRoom filters when possible
-4. **Use date ranges**: Specify dateFrom/dateTo for better performance
-5. **Handle queue types**: Be prepared for both PATIENT and NON_PATIENT entries
-6. **Respect priority**: Higher priority numbers = higher priority (if used)
-7. **Cache display data**: Queue displays can cache data for 5-10 seconds
+1. **Date formats differ by endpoint**: the raw create responses (`/checkin`, `/selfcheckin`) and `/display` entries serialize dates as epoch milliseconds; the kiosk lookups (`?ticketNumber=`, `?visitNumber=`) and the journey (`?journey=true`) format them as ISO 8601 strings
+2. **Always handle errors**: go by the HTTP status. `/checkin`, `/selfcheckin` and `/kiosk` answer the problems they check themselves (an unknown patient, location or identifier, or a missing required field) with HTTP 500 and the reason in `error.message`. `success` on `/checkin` is always `true`
+3. **Use polling for displays**: Don't poll more frequently than every 5 seconds
+4. **Filter by location**: Always provide location/queueRoom filters when possible
+5. **Use date ranges**: Specify dateFrom/dateTo for better performance
+6. **Handle queue types**: Be prepared for both PATIENT and NON_PATIENT entries
+7. **Respect priority**: Higher priority numbers = higher priority (if used)
+8. **Cache display data**: Queue displays can cache data for 5-10 seconds
 
 ---
 
