@@ -51,11 +51,12 @@ import java.util.List;
  * UgandaEMR pattern with SelfCheckIn DTO (extends CheckInPatient) and DelegatingCrudResource
  * extension. Resource path: /ws/rest/v1/patientqueueing/selfcheckin
  * <p>
- * Check-in logic: 1. If patient identification (identifierTypeUuid + identifierValue OR configured
- * attribute types) is provided, try to find a matching patient first 2. If not found but phone
- * number provided, check if phone matches any patient using GP_PHONE_NUMBER_ATTRIBUTE_TYPE 3. If
- * patient found → create PatientQueue + Visit 4. If no patient found → create NonPatientQueue
- * (using displayName, phoneNumber, etc.)
+ * Check-in logic: 1. If patient identification (identifierTypeUuid + identifierValue) is provided,
+ * look the patient up under that configured type only; a lookup that runs and matches nobody
+ * refuses the check-in rather than falling back to the phone number, which may belong to someone
+ * else 2. Only when NO identification was supplied does a provided phoneNumber get matched via
+ * GP_PHONE_NUMBER_ATTRIBUTE_TYPE 3. If a patient is found → create PatientQueue + Visit 4. If no
+ * patient was identified → create NonPatientQueue (using displayName, phoneNumber, etc.)
  * <p>
  * Uses global properties to configure: - Person attribute types for phone number lookup
  * (GP_PHONE_NUMBER_ATTRIBUTE_TYPE) - Patient identifier types for identifier lookup
@@ -216,6 +217,31 @@ public class SelfCheckInPatientResource extends DelegatingCrudResource<SelfCheck
 	}
 	
 	/**
+	 * Find the one patient holding the given value under an attribute type. Refuses to guess when
+	 * the value is shared by more than one patient — the same rule for every attribute lookup, kept
+	 * in one place.
+	 * 
+	 * @param valueLabel how to name the value in the shared-value error (e.g. "phone number" or the
+	 *            attribute type name)
+	 * @return the single matching Patient, or null if none matches
+	 * @throws IllegalArgumentException when the value is shared by more than one patient
+	 */
+	private Patient getUnambiguousPatientByAttributeValue(PersonAttributeType attributeType, String attributeValue,
+	        String valueLabel) {
+		PatientQueueingService queueingService = Context.getService(PatientQueueingService.class);
+		
+		int matches = queueingService.countPatientsByPersonAttributeValue(attributeType.getPersonAttributeTypeId(),
+		    attributeValue);
+		if (matches > 1) {
+			throw new IllegalArgumentException("This " + valueLabel
+			        + " is shared by more than one patient. Please check in with another identifier.");
+		}
+		
+		return matches == 1 ? queueingService.getPatientByPersonAttributeValue(attributeType.getPersonAttributeTypeId(),
+		    attributeValue) : null;
+	}
+	
+	/**
 	 * Find patient by phone number using the configured phone number attribute type. Refuses to
 	 * guess when the number is shared by more than one patient.
 	 */
@@ -224,7 +250,7 @@ public class SelfCheckInPatientResource extends DelegatingCrudResource<SelfCheck
 			log.info("No phone number attribute type configured, skipping phone-based patient lookup");
 			return null;
 		}
-		
+
 		try {
 			PersonAttributeType attributeType = Context.getPersonService().getPersonAttributeTypeByUuid(
 			    phoneNumberAttributeTypeUuid);
@@ -232,19 +258,8 @@ public class SelfCheckInPatientResource extends DelegatingCrudResource<SelfCheck
 				log.warn("Phone number attribute type not found for UUID: " + phoneNumberAttributeTypeUuid);
 				return null;
 			}
-			
-			PatientQueueingService queueingService = Context.getService(PatientQueueingService.class);
-			int matches = queueingService.countPatientsByPersonAttributeValue(attributeType.getPersonAttributeTypeId(),
-			    phoneNumber);
-			if (matches > 1) {
-				throw new IllegalArgumentException(
-				        "This phone number is shared by more than one patient. Please check in with another identifier.");
-			}
-			if (matches == 1) {
-				return queueingService.getPatientByPersonAttributeValue(attributeType.getPersonAttributeTypeId(),
-				    phoneNumber);
-			}
-			return null;
+
+			return getUnambiguousPatientByAttributeValue(attributeType, phoneNumber, "phone number");
 		}
 		catch (IllegalArgumentException | DAOException e) {
 			throw e;
@@ -402,7 +417,9 @@ public class SelfCheckInPatientResource extends DelegatingCrudResource<SelfCheck
 	 * @param identifierValue the value to search for
 	 * @param personAttributeTypeUuidsStr CSV of configured person attribute type UUIDs
 	 * @param identifierTypeUuidsStr CSV of configured identifier type UUIDs
-	 * @return the matching Patient, or null if not found
+	 * @return the matching Patient; throws rather than returning null once identification was
+	 *         supplied — a configured miss refuses with "No patient found", an unresolvable type
+	 *         reports the configuration problem
 	 */
 	private Patient resolvePatientByIdentifier(String identifierTypeUuid, String identifierValue,
 	        String personAttributeTypeUuidsStr, String identifierTypeUuidsStr) {
@@ -415,8 +432,8 @@ public class SelfCheckInPatientResource extends DelegatingCrudResource<SelfCheck
 		
 		String type = identifierTypeUuid.trim();
 		// Only a lookup that ran against a type that exists can answer "no patient"; a type that
-		// does not resolve is a configuration problem, and a lookup that fails reaches the client
-		// as itself rather than as a miss
+		// does not resolve is a configuration problem, and a lookup error propagates to the
+		// client rather than being treated as no-match
 		boolean lookedUp = false;
 		if (parseUuidSet(personAttributeTypeUuidsStr).contains(type)) {
 			PersonAttributeType attributeType = Context.getPersonService().getPersonAttributeTypeByUuid(type);
@@ -427,18 +444,22 @@ public class SelfCheckInPatientResource extends DelegatingCrudResource<SelfCheck
 				if (patient != null) {
 					return patient;
 				}
+			} else {
+				log.warn("Configured self check-in person attribute type did not resolve or is retired: " + type);
 			}
 		}
 		if (parseUuidSet(identifierTypeUuidsStr).contains(type)) {
 			org.openmrs.PatientIdentifierType identifierType = Context.getPatientService().getPatientIdentifierTypeByUuid(
 			    type);
-			if (identifierType != null) {
+			if (identifierType != null && !identifierType.getRetired()) {
 				log.info("Looking up patient by identifier type: " + type);
 				lookedUp = true;
 				Patient patient = getPatientByIdentifier(identifierValue, identifierType);
 				if (patient != null) {
 					return patient;
 				}
+			} else {
+				log.warn("Configured self check-in identifier type did not resolve or is retired: " + type);
 			}
 		}
 		if (lookedUp) {
@@ -456,24 +477,17 @@ public class SelfCheckInPatientResource extends DelegatingCrudResource<SelfCheck
 	 * the resolved type the client sent — searching other configured types here would match a value
 	 * held as a different attribute (e.g. a phone number stored as another patient's next-of-kin).
 	 * Uses efficient database queries instead of loading all patients into memory.
+	 * 
+	 * @throws IllegalArgumentException when the value is shared by more than one patient
 	 */
 	private Patient getPatientByPersonAttribute(String attributeValue, PersonAttributeType attributeType) {
-		PatientQueueingService queueingService = Context.getService(PatientQueueingService.class);
-		
-		// Refuse to guess when the attribute value is shared by more than one patient
-		int matches = queueingService.countPatientsByPersonAttributeValue(attributeType.getPersonAttributeTypeId(),
-		    attributeValue);
-		if (matches > 1) {
-			throw new IllegalArgumentException("This " + attributeType.getName()
-			        + " is shared by more than one patient. Please check in with another identifier.");
-		}
-		
-		return matches == 1 ? queueingService.getPatientByPersonAttributeValue(attributeType.getPersonAttributeTypeId(),
-		    attributeValue) : null;
+		return getUnambiguousPatientByAttributeValue(attributeType, attributeValue, attributeType.getName());
 	}
 	
 	/**
 	 * Find patient by a specific resolved identifier type
+	 * 
+	 * @throws IllegalArgumentException when the identifier is shared by more than one patient
 	 */
 	private Patient getPatientByIdentifier(String identifierValue, org.openmrs.PatientIdentifierType identifierType) {
 		List<org.openmrs.PatientIdentifier> identifiers = Context.getPatientService().getPatientIdentifiers(identifierValue,

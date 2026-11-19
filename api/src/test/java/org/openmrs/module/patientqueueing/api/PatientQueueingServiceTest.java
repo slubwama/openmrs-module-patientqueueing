@@ -836,10 +836,9 @@ public class PatientQueueingServiceTest extends BaseModuleContextSensitiveTest {
 		PatientQueueingService service = Context.getService(PatientQueueingService.class);
 		Location room = Context.getLocationService().getLocation(1);
 		
-		// a pending PATIENT entry created today: without the empty-list guard (dropping the
-		// filter counts facility-wide), this entry would appear and the assertion below would
-		// fail — the earlier version of this test queued a non-patient ticket, which this
-		// patient-only count never sees, so it passed either way
+		// the entry must be a PENDING patient entry created today: without the empty-list guard
+		// (dropping the filter counts facility-wide), this entry would appear and the assertion
+		// below would fail
 		PatientQueue pending = new PatientQueue();
 		pending.setPatient(Context.getPatientService().getPatient(10000));
 		pending.setLocationFrom(room);
