@@ -24,7 +24,7 @@ The **Patient Queueing Module** is an API-based OpenMRS module designed to facil
 - ✅ **Unified Queue View**: Single API for patient and non-patient queues
 - ✅ **Ticket Lookup**: Search queue by ticket number
 - ✅ **Public Displays**: "Now serving" and "up next" information
-- ✅ **Queue Statistics**: Real-time statistics for dashboard displays
+- ✅ **Display stats**: now-serving / up-next counts on the display feed payload
 - ✅ **FIFO Ordering**: First-in-first-out queue management
 
 ### Provider Features
@@ -199,7 +199,7 @@ Walk-in visitor queue entries:
   "displayName": "Jane Smith",
   "phoneNumber": "+1234567890",
   "queueType": {...},  // Concept
-  "status": "WAITING",  // WAITING, CALLED, ARRIVED, SERVING, COMPLETED, CANCELLED
+  "status": "WAITING",  // WAITING, CALLED, ARRIVED, SERVING, COMPLETED, SKIPPED, CANCELLED, HOLD, NO_SHOW, TRANSFERRED
   "locationTo": {...},
   "queueRoom": {...}
 }
@@ -257,7 +257,7 @@ cd openmrs-module-patientqueueing
 mvn clean install
 ```
 
-The module artifact (`patientqueueing-2.0.2-SNAPSHOT.omod`) will be created in the `omod/target` directory.
+The module artifact (`patientqueueing-3.0.0-SNAPSHOT.omod`) will be created in the `omod/target` directory.
 
 ---
 
@@ -332,10 +332,11 @@ This module is maintained by the OpenMRS community. For any issues or feature re
 
 ## Changelog
 
-### Version 2.0.2-SNAPSHOT (Current)
+### Version 3.0.0-SNAPSHOT (Current)
+- Requires OpenMRS Platform 2.8.x and enforces queue privileges; grant them as listed under Privileges & Roles when upgrading
 - ✅ Added non-patient queue management
 - ✅ Added self check-in endpoints (patient and non-patient)
-- ✅ Added unified queue display APIs (kiosk, display, statistics)
+- ✅ Added unified queue display APIs (kiosk, display)
 - ✅ Added provider auto-assignment strategies
 - ✅ Distribution-agnostic configuration
 - ✅ Polymorphic QueueEntry DTO

@@ -131,7 +131,8 @@ public class SelfCheckInPatientResource extends DelegatingCrudResource<SelfCheck
 			    identifierTypeUuidsStr);
 		}
 		
-		// If no patient found via direct identification but phone number provided, check via phone attribute
+		// Only a check-in without an identifier gets here with no patient: an identifier miss is
+		// refused above rather than falling back to a phone number that may belong to someone else
 		if (patient == null && phoneNumber != null) {
 			patient = findPatientByPhoneNumber(phoneNumber, phoneNumberAttributeTypeUuid);
 		}

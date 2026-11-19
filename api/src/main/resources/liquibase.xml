@@ -305,10 +305,11 @@
 
     <!-- Upgrade path: liquibase runs before config.xml creates privileges, so insert the two
          new enforced privileges here first (config.xml skips privileges that already exist),
-         then grant them to roles that already hold the legacy queue privileges. Roles such as
-         UgandaEMR's Reception hold sendPatientToQueue/completePatientQueue and check patients
-         in through savePatientQue; without these grants they get 403 on viewQueue- and
-         manageQueue-protected endpoints after upgrading. -->
+         then grant them to roles that already hold the legacy queue privileges, such as
+         UgandaEMR's Counselor and clinic roles; without these grants they get 403 on viewQueue-
+         and manageQueue-protected endpoints after upgrading. Roles holding neither, such as
+         UgandaEMR's Reception and Triage, get nothing here and need the grants the README
+         lists. -->
     <changeSet author="slubwama" id="patientqueueing_view_queue_privilege-1">
         <preConditions onFail="MARK_RAN">
             <sqlCheck expectedResult="0">SELECT COUNT(*) FROM privilege WHERE privilege = 'Task: patientqueueing.viewQueue'</sqlCheck>

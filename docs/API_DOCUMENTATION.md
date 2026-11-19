@@ -21,13 +21,14 @@
 
 Generic patient check-in with configurable visit type. Supports provider auto-assignment, queue position calculation, and estimated wait time.
 
-**Endpoint**: `POST /ws/rest/v1/patientqueueing/checkin`
+**Endpoint**: `POST /ws/rest/v1/patientqueueing/checkin` — **Requires**: `Task: patientqueueing.sendPatientToQueue` and `Task: patientqueueing.viewQueue` (enforced at the service layer); creating the visit additionally needs `Get Visits`, `Get Visit Types` and `Add Visits`
 
 **Parameters**:
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | patient | string | Yes | Patient UUID |
-| locationTo | string | Yes | Destination Location UUID |
+| locationTo | string | Yes | Destination Location UUID (the pre-2.8 `location` key is accepted as an alias) |
+| locationFrom | string | No | Origin location UUID (defaults to locationTo) |
 | visitType | string | No | Visit type UUID (overrides default) |
 | queueRoom | string | No | Queue room UUID |
 | provider | string | No | Provider UUID (skips auto-assignment) |
@@ -35,38 +36,32 @@ Generic patient check-in with configurable visit type. Supports provider auto-as
 | comment | string | No | Comment for the queue entry |
 | autoAssignProvider | boolean | No | Override auto-assignment setting |
 
-**Response**: `CheckInResult`
+**Response** (built by CheckInResource.create; errors surface as HTTP error codes):
 ```json
 {
+  "uuid": "queue-uuid",
+  "ticketNumber": "21/04/2026-LOC-001",
+  "status": "PENDING",
+  "dateCreated": "2026-04-21T10:30:00Z",
+  "queuePosition": 5,
+  "estimatedWaitMinutes": 25,
+  "success": true,
   "patient": {
     "uuid": "patient-uuid",
     "display": "John Doe"
   },
-  "visit": null,
+  "visit": {
+    "uuid": "visit-uuid",
+    "startDatetime": "2026-04-21T00:00:00Z",
+    "visitType": "OPD"
+  },
   "queueEntry": {
     "uuid": "queue-uuid",
-    "ticketNumber": "21/04/2026-LOC-001",
+    "visitNumber": "21/04/2026-LOC-001",
     "status": "PENDING",
-    "displayName": "John Doe",
-    "queueType": "PATIENT",
-    "locationTo": {
-      "uuid": "location-uuid",
-      "display": "Outpatient Clinic"
-    },
-    "queueRoom": {
-      "uuid": "room-uuid",
-      "display": "Room 1"
-    },
-    "dateCreated": "2026-04-21T10:30:00+00:00",
-    "priority": null,
-    "comment": null,
-    "isPatientQueue": true
-  },
-  "ticketNumber": "21/04/2026-LOC-001",
-  "estimatedWaitMinutes": 25,
-  "queuePosition": 5,
-  "success": true,
-  "errorMessage": null
+    "dateCreated": "2026-04-21T10:30:00Z",
+    "provider": "provider-uuid-or-null"
+  }
 }
 ```
 
@@ -86,7 +81,20 @@ curl -X POST -H 'Content-Type: application/json' \
 
 Self check-in endpoint for booth/kiosk scenarios. Simplified interface for self-service check-in.
 
-**Endpoint**: `POST /ws/rest/v1/patientqueueing/selfcheckin`
+**Endpoint**: `POST /ws/rest/v1/patientqueueing/selfcheckin` — **Requires**: `Task: patientqueueing.sendPatientToQueue` when the kiosk identifies a patient, `Task: patientqueueing.checkIn` when it creates a non-patient ticket; visit creation additionally needs `Get Visits`, `Get Visit Types` and `Add Visits` when `patientqueueing.selfCheckInVisitTypeUuid` is set (see the README's kiosk device-account row)
+
+**Parameters**:
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| currentLocation | string | Yes | Location UUID the kiosk is at |
+| locationTo | string | Yes | Destination location UUID |
+| queueRoom | string | Yes | Queue room UUID |
+| identifierTypeUuid | string | No | UUID of a configured identifier type (see `patientqueueing.selfCheckInIdentifierTypeUuids` / `...PersonAttributeTypeUuids`); when supplied with identifierValue, a miss is refused rather than falling back |
+| identifierValue | string | No | The identifier value to look up |
+| phoneNumber | string | No | Matched to a patient via `patientqueueing.phoneNumberAttributeTypeUuid` only when no identifier was supplied |
+| displayName | string | Required for non-patient check-in | The visitor's name when no patient is identified |
+| queueTypeUuid | string | No | Concept UUID classifying the non-patient ticket |
+| priority | int | No | Priority level |
 
 **Example**:
 ```bash
@@ -100,35 +108,53 @@ curl -X POST -H 'Content-Type: application/json' \
       }'
 ```
 
-**Response**: `CheckInResult`
+**Response**: depends on the outcome — `checkInType` tells them apart. There is no `success`
+field; validation and lookup problems surface as HTTP 400s with a message.
+
+Patient match (identifier or phone resolved to a patient; `patient.display` is masked):
 ```json
 {
-  "patient": null,
-  "visit": null,
-  "queueEntry": {
+  "checkInType": "patient",
+  "uuid": "queue-uuid",
+  "patientQueue": {
     "uuid": "queue-uuid",
+    "visitNumber": "21/04/2026-LOC-001",
+    "status": "PENDING",
+    "dateCreated": "2026-04-21T10:30:00Z"
+  },
+  "patient": {
+    "uuid": "patient-uuid",
+    "display": "J. D***"
+  },
+  "visit": {
+    "uuid": "visit-uuid",
+    "startDatetime": "2026-04-21T00:00:00Z",
+    "stopDatetime": null,
+    "visitType": "OPD"
+  },
+  "ticketNumber": "21/04/2026-LOC-001",
+  "visitNumber": "21/04/2026-LOC-001"
+}
+```
+`visit` is `null` when `patientqueueing.selfCheckInVisitTypeUuid` is not set.
+
+No patient identified (non-patient ticket):
+```json
+{
+  "checkInType": "nonPatient",
+  "uuid": "non-patient-queue-uuid",
+  "displayName": "Jane Smith",
+  "phoneNumber": "+1234567890",
+  "ticketNumber": "21/04/2026-LOC-TYPE-001",
+  "status": "WAITING",
+  "nonPatientQueue": {
+    "uuid": "non-patient-queue-uuid",
+    "displayName": "Jane Smith",
+    "phoneNumber": "+1234567890",
     "ticketNumber": "21/04/2026-LOC-TYPE-001",
     "status": "WAITING",
-    "displayName": "Jane Smith",
-    "queueType": "NON_PATIENT",
-    "locationTo": {
-      "uuid": "location-uuid",
-      "display": "Outpatient Clinic"
-    },
-    "queueRoom": {
-      "uuid": "room-uuid",
-      "display": "Room 1"
-    },
-    "dateCreated": "2026-04-21T10:30:00+00:00",
-    "priority": null,
-    "comment": null,
-    "isPatientQueue": false
-  },
-  "ticketNumber": "21/04/2026-LOC-TYPE-001",
-  "estimatedWaitMinutes": 10,
-  "queuePosition": 2,
-  "success": true,
-  "errorMessage": null
+    "dateCreated": "2026-04-21T10:30:00Z"
+  }
 }
 ```
 
@@ -138,7 +164,7 @@ curl -X POST -H 'Content-Type: application/json' \
 
 Create a non-patient queue entry (for visitors, companions, etc.).
 
-**Endpoint**: `POST /ws/rest/v1/patientqueueing/nonpatientqueue`
+**Endpoint**: `POST /ws/rest/v1/patientqueueing/nonpatientqueue` — **Requires**: `Task: patientqueueing.checkIn`
 
 **Example**:
 ```bash
@@ -153,6 +179,30 @@ curl -X POST -H 'Content-Type: application/json' \
       }'
 ```
 
+**Response**: the created `NonPatientQueue` in its default representation:
+```json
+{
+  "uuid": "non-patient-queue-uuid",
+  "displayName": "Jane Smith",
+  "phoneNumber": "+1234567890",
+  "queueType": null,
+  "currentLocation": {"uuid": "location-uuid", "display": "OPD"},
+  "locationTo": {"uuid": "location-uuid", "display": "OPD"},
+  "queueRoom": {"uuid": "room-uuid", "display": "Room 1"},
+  "status": "WAITING",
+  "priority": null,
+  "comment": null,
+  "ticketNumber": "21/04/2026-LOC-TYPE-001",
+  "calledBy": null,
+  "calledAt": null,
+  "arrivedAt": null,
+  "servedBy": null,
+  "startedAt": null,
+  "endedAt": null,
+  "links": [ {"rel": "self", "uri": ".../nonpatientqueue/non-patient-queue-uuid"} ]
+}
+```
+
 ---
 
 ## Queue Display APIs
@@ -161,7 +211,7 @@ curl -X POST -H 'Content-Type: application/json' \
 
 Look up a queue entry by ticket number. Searches both patient and non-patient queues.
 
-**Endpoint**: `GET /ws/rest/v1/patientqueueing/kiosk`
+**Endpoint**: `GET /ws/rest/v1/patientqueueing/kiosk` — **Requires**: `Task: patientqueueing.viewQueue`
 
 **Parameters**:
 | Parameter | Type | Required | Description |
@@ -170,28 +220,21 @@ Look up a queue entry by ticket number. Searches both patient and non-patient qu
 | dateFrom | long | No | Start date (milliseconds, default: start of today) |
 | dateTo | long | No | End date (milliseconds, default: end of today) |
 
-**Response**: `QueueEntry`
+**Response**: pageable `results` array; each entry carries exactly what the kiosk lookup builds
+(`displayName` is masked):
 ```json
 {
-  "uuid": "queue-uuid",
-  "ticketNumber": "21/04/2026-LOC-001",
-  "status": "PENDING",
-  "displayName": "John Doe",
-  "queueType": "PATIENT",
-  "locationTo": {
-    "uuid": "location-uuid",
-    "display": "Outpatient Clinic"
-  },
-  "queueRoom": {
-    "uuid": "room-uuid",
-    "display": "Room 1"
-  },
-  "dateCreated": "2026-04-21T10:30:00+00:00",
-  "priority": null,
-  "comment": null,
-  "isPatientQueue": true
+  "results": [
+    {
+      "ticketNumber": "21/04/2026-LOC-001",
+      "status": "PENDING",
+      "displayName": "J. D***",
+      "dateCreated": "2026-04-21T10:30:00Z"
+    }
+  ]
 }
 ```
+An unknown ticket number answers HTTP 400 with "No queue entry found for ticket number: ...".
 
 **Example**:
 ```bash
@@ -203,7 +246,7 @@ curl -X GET \
 
 Get a ticket's full journey through the facility (completed, current and upcoming services).
 
-**Endpoint**: `GET /ws/rest/v1/patientqueueing/kiosk`
+**Endpoint**: `GET /ws/rest/v1/patientqueueing/kiosk` — **Requires**: `Task: patientqueueing.viewQueue`
 
 **Parameters**:
 | Parameter | Type | Required | Description |
@@ -217,55 +260,145 @@ curl -X GET \
   'http://localhost:8080/openmrs/ws/rest/v1/patientqueueing/kiosk?journey=true&ticketNumber=21/04/2026-LOC-001'
 ```
 
+**Response**: pageable `results` array with the journey as its single entry (`displayName` is
+masked; `patientUuid` is always `null`):
+```json
+{
+  "results": [
+    {
+      "displayName": "J. D***",
+  "patientUuid": null,
+  "ticketNumber": "21/04/2026-LOC-001",
+  "overallStatus": "IN_PROGRESS",
+  "completedServices": [
+    {
+      "uuid": "queue-uuid-0",
+      "service": "Triage",
+      "room": "Room 1",
+      "roomUuid": "room-uuid",
+      "status": "COMPLETED",
+      "checkedInAt": "2026-04-21T09:00:00Z",
+      "type": "PATIENT",
+      "completedAt": "2026-04-21T09:25:00Z",
+      "durationMinutes": 25
+    }
+  ],
+  "currentService": {
+    "uuid": "queue-uuid-1",
+    "service": "Outpatient Clinic",
+    "room": "Room 2",
+    "roomUuid": "room-uuid-2",
+    "status": "PENDING",
+    "checkedInAt": "2026-04-21T10:30:00Z",
+    "type": "PATIENT",
+    "position": 2,
+    "queueLength": 5,
+    "estimatedWaitMinutes": 10
+  },
+  "nextServices": [
+    {
+      "uuid": "queue-uuid-2",
+      "service": "Laboratory",
+      "room": "Lab Room",
+      "roomUuid": "room-uuid-3",
+      "status": "WAITING",
+      "checkedInAt": "2026-04-21T10:35:00Z",
+      "type": "NON_PATIENT"
+    }
+  ]
+}
+  ]
+}
+```
+`overallStatus` is `COMPLETED` when no service is current, `IN_PROGRESS` otherwise.
+`completedServices` entries add `completedAt` and `durationMinutes` when the completion date is
+known; `currentService` adds `position`, `queueLength` and `estimatedWaitMinutes` when it is
+waiting AND its queue room has waiting stats — `estimatedWaitMinutes` is `null` when no average
+service time is known for the room. NO_SHOW, CANCELLED (non-patient
+entries only) and TRANSFERRED entries count as terminal and are listed under
+`completedServices`.
+
 ### Look Up a Single Queue Entry
 
 Get one queue entry (patient or non-patient) by ticket or visit number.
 
-**Endpoint**: `GET /ws/rest/v1/patientqueueing/kiosk`
+**Endpoint**: `GET /ws/rest/v1/patientqueueing/kiosk` — **Requires**: `Task: patientqueueing.viewQueue`
 
 **Parameters**:
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| ticketNumber | string | Yes (or visitNumber) | Ticket number to search |
-| visitNumber | string | Yes (or ticketNumber) | Visit number alias for ticketNumber |
-| dateFrom | long | No | Start date (milliseconds, default: start of today) |
-| dateTo | long | No | End date (milliseconds, default: end of today) |
+| visitNumber | string | Yes | Visit number to search (UgandaEMR-style lookup) |
 
-**Response**: Array of `QueueEntry`
+This section covers `?visitNumber=` requests only. A `?ticketNumber=` request with no
+`visitNumber` follows the clean single-lookup format documented under **Get Queue by Ticket
+Number** above, and that path — unlike this one — accepts explicit `dateFrom`/`dateTo`. The
+window here comes from the date embedded in the number (formats `DD/MM/YYYY-...` or
+`YYYY-MM-DD-...`), falling back to today for a bare number.
+
+**Response**: this path is wrapped TWICE — the REST paging layer puts the UgandaEMR-style
+object under a paging `results` key, and that object itself holds a `results` array of the
+kiosk status objects (queue position and estimated wait on waiting entries; `displayName`
+masked):
 ```json
-[
-  {
-    "uuid": "queue-uuid-1",
-    "ticketNumber": "21/04/2026-LOC-001",
-    "status": "PENDING",
-    "displayName": "John Doe",
-    "queueType": "PATIENT",
-    "locationTo": {...},
-    "queueRoom": {...},
-    "dateCreated": "2026-04-21T10:30:00+00:00",
-    "isPatientQueue": true
-  },
-  {
-    "uuid": "queue-uuid-2",
-    "ticketNumber": "21/04/2026-LOC-TYPE-001",
-    "status": "WAITING",
-    "displayName": "Jane Smith",
-    "queueType": "NON_PATIENT",
-    "locationTo": {...},
-    "queueRoom": {...},
-    "dateCreated": "2026-04-21T10:31:00+00:00",
-    "isPatientQueue": false
-  }
-]
+{
+  "results": [
+    {
+      "results": [
+        {
+      "uuid": "queue-uuid-1",
+      "ticketNumber": "21/04/2026-LOC-001",
+      "visitNumber": "21/04/2026-LOC-001",
+      "status": "PENDING",
+      "queueLocation": "Outpatient Clinic",
+      "serviceLocation": "Room 1",
+      "checkedInAt": "2026-04-21T10:30:00Z",
+      "dateCreated": "2026-04-21T10:30:00Z",
+      "datePicked": null,
+      "dateCompleted": null,
+      "locationTo": { "uuid": "location-uuid", "display": "Outpatient Clinic", "name": "Outpatient Clinic" },
+      "queueRoom": { "uuid": "room-uuid", "display": "Room 1", "name": "Room 1" },
+      "displayName": "J. D***",
+      "queueType": "PATIENT",
+      "position": 2,
+      "queueLength": 5,
+      "estimatedWaitMinutes": 10
+    },
+    {
+      "uuid": "queue-uuid-2",
+      "ticketNumber": "21/04/2026-LOC-TYPE-001",
+      "status": "WAITING",
+      "queueLocation": "Outpatient Clinic",
+      "serviceLocation": "Room 1",
+      "checkedInAt": "2026-04-21T10:31:00Z",
+      "dateCreated": "2026-04-21T10:31:00Z",
+      "dateCompleted": null,
+      "locationTo": { "uuid": "location-uuid", "display": "Outpatient Clinic", "name": "Outpatient Clinic" },
+      "queueRoom": { "uuid": "room-uuid", "display": "Room 1", "name": "Room 1" },
+      "displayName": "J. S***",
+          "queueType": "NON_PATIENT",
+          "position": 1,
+          "queueLength": 2,
+          "estimatedWaitMinutes": 0
+        }
+      ]
+    }
+  ]
+}
 ```
 
+
+**Example**:
+```bash
+curl -X GET \
+  'http://localhost:8080/openmrs/ws/rest/v1/patientqueueing/kiosk?visitNumber=21/04/2026-LOC-001'
+```
 
 
 ### Get Queue Display Data
 
 Get display data for public queue monitors, including "now serving" and "up next" information.
 
-**Endpoint**: `GET /ws/rest/v1/patientqueueing/display`
+**Endpoint**: `GET /ws/rest/v1/patientqueueing/display` — **Requires**: `Task: patientqueueing.viewQueue`
 
 **Parameters**:
 | Parameter | Type | Required | Description |
@@ -274,53 +407,53 @@ Get display data for public queue monitors, including "now serving" and "up next
 | uuid | string | Yes | UUID of the location for the chosen type |
 | date | string | No | `today` (default) or `YYYY-MM-DD` |
 
-**Response**:
+**Response**: built as `context` / `nowServing` / `upNext` / `stats` / `lastUpdated`
+(`displayName` is masked on every row):
 ```json
 {
-  "location": {
-    "uuid": "location-uuid",
-    "display": "Outpatient Clinic"
-  },
-  "queueRoom": {
-    "uuid": "room-uuid",
-    "display": "Room 1"
-  },
-  "nowServing": {
-    "uuid": "queue-uuid",
-    "ticketNumber": "21/04/2026-LOC-001",
-    "status": "PICKED",
-    "displayName": "John Doe",
-    "queueType": "PATIENT",
-    "calledAt": "2026-04-21T10:45:00+00:00"
-  },
+  "results": [
+    {
+      "context": {
+        "type": "LOCATION",
+        "locationUuid": "location-uuid",
+        "locationName": "Outpatient Clinic"
+      },
+  "nowServing": [
+    {
+      "uuid": "queue-uuid",
+      "ticketNumber": "21/04/2026-LOC-001",
+      "status": "PICKED",
+      "displayName": "J. D***",
+      "queueLocation": "Outpatient Clinic",
+      "serviceLocation": "Room 1",
+      "dateCreated": "2026-04-21T10:30:00Z",
+      "priority": 1,
+      "priorityScore": null,
+      "priorityReason": null
+    }
+  ],
   "upNext": [
     {
       "uuid": "queue-uuid-2",
       "ticketNumber": "21/04/2026-LOC-002",
       "status": "PENDING",
-      "displayName": "Jane Smith",
-      "queueType": "PATIENT"
-    },
-    {
-      "uuid": "queue-uuid-3",
-      "ticketNumber": "21/04/2026-LOC-TYPE-001",
-      "status": "WAITING",
-      "displayName": "Bob Johnson",
-      "queueType": "NON_PATIENT"
+      "displayName": "J. S***",
+      "queueLocation": "Outpatient Clinic",
+      "serviceLocation": "Room 1",
+      "dateCreated": "2026-04-21T10:31:00Z",
+      "priority": null,
+      "priorityScore": null,
+      "priorityReason": null
     }
   ],
-  "statistics": {
-    "patientWaiting": 8,
-    "patientServing": 2,
-    "patientCompleted": 45,
-    "nonPatientWaiting": 3,
-    "nonPatientServing": 1,
-    "nonPatientCompleted": 12,
-    "totalWaiting": 11,
-    "totalServing": 3,
-    "totalCompleted": 57
+  "stats": {
+    "nowServingCount": 1,
+    "upNextCount": 4,
+    "totalCount": 5
   },
-  "lastUpdated": "2026-04-21T10:50:00+00:00"
+      "lastUpdated": "2026-04-21T10:50:00Z"
+    }
+  ]
 }
 ```
 
@@ -330,41 +463,29 @@ curl -X GET \
   'http://localhost:8080/openmrs/ws/rest/v1/patientqueueing/display?type=location&uuid=b1e39c4d-1234-5678-9abc-def456789013'
 ```
 
-### Get Queue Statistics
-
-Get queue statistics for a location.
-
-**Endpoint**: `GET /ws/rest/v1/patientqueueing/display`
-
-**Parameters**: Same as display data
-
-**Response**: `statistics` object (see above)
-
-**Example**:
-```bash
-curl -X GET \
-  'http://localhost:8080/openmrs/ws/rest/v1/patientqueueing/display?type=location&uuid=b1e39c4d-1234-5678-9abc-def456789013'
-```
-
----
-
 ## Non-Patient Queue Management
 
 ### List All Non-Patient Queues
+
+**Requires**: `Task: patientqueueing.viewQueue`
 
 **Endpoint**: `GET /ws/rest/v1/patientqueueing/nonpatientqueue`
 
 **Parameters**:
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| status | string | No | Filter by status (WAITING, CALLED, ARRIVED, SERVING, COMPLETED, CANCELLED) |
+| status | string | No | Filter by status — any of WAITING, CALLED, ARRIVED, SERVING, COMPLETED, SKIPPED, CANCELLED, HOLD, NO_SHOW, TRANSFERRED |
 | queueType | string | No | Filter by queue type Concept UUID |
 | locationTo | string | No | Filter by destination location UUID |
 | queueRoom | string | No | Filter by queue room UUID |
 | fromDate | long | No | Start date (milliseconds) |
 | toDate | long | No | End date (milliseconds) |
 
-**Response**: Paged list of `NonPatientQueue`
+COMPLETED entries are omitted unless `includeHistory=true`, and with no
+`fromDate`/`toDate` the window defaults to today — a reporting client must pass explicit dates
+or it never sees completed tickets.
+
+**Response**: paged list of `NonPatientQueue` under the standard `results` envelope
 
 **Example**:
 ```bash
@@ -374,9 +495,11 @@ curl -X GET \
 
 ### Get Non-Patient Queue by UUID
 
+**Requires**: `Task: patientqueueing.viewQueue`
+
 **Endpoint**: `GET /ws/rest/v1/patientqueueing/nonpatientqueue/:uuid`
 
-**Response**: `NonPatientQueue` (full representation)
+**Response**: `NonPatientQueue` (default representation; `v=full` adds audit fields)
 
 **Example**:
 ```bash
@@ -402,22 +525,12 @@ curl -X GET \
 }
 ```
 
-**Response**: Created `NonPatientQueue`
-
-**Example**:
-```bash
-curl -X POST -H 'Content-Type: application/json' \
-  'http://localhost:8080/openmrs/ws/rest/v1/patientqueueing/nonpatientqueue' \
-  -d '{
-        "displayName": "Jane Smith",
-        "phoneNumber": "+1234567890",
-        "currentLocation": "b1e39c4d-1234-5678-9abc-def456789013",
-        "locationTo": "b1e39c4d-1234-5678-9abc-def456789013",
-        "queueRoom": "c1e39c4d-1234-5678-9abc-def456789014"
-      }'
-```
+Same endpoint and request as [Non-Patient Check-in](#non-patient-check-in), which holds the
+full request/response documentation. **Requires**: `Task: patientqueueing.checkIn`.
 
 ### Update Non-Patient Queue
+
+**Requires**: `Task: patientqueueing.manageQueue` (plus `Task: patientqueueing.viewQueue` to resolve the entry)
 
 **Endpoint**: `POST /ws/rest/v1/patientqueueing/nonpatientqueue/:uuid`
 
@@ -452,8 +565,13 @@ curl -X POST -H 'Content-Type: application/json' \
 | status | string | Filter by status |
 | fromDate | long | Start date (milliseconds) |
 | toDate | long | End date (milliseconds) |
+| queueType | string | No | Queue type concept UUID |
+| locationTo | string | No | Destination location UUID |
 
-**Response**: Paged list of matching `NonPatientQueue`
+As with the list endpoint, COMPLETED entries are omitted unless `includeHistory=true`, and the
+window defaults to today when no dates are given.
+
+**Response**: paged list of matching `NonPatientQueue` under the standard `results` envelope
 
 **Example**:
 ```bash
@@ -478,7 +596,7 @@ enforced by the service's transition rules.
 |-----------|------|----------|-------------|
 | uuid | string | Yes | UUID of the queue room location |
 
-**Response**: Paged list of `ProviderQueueEntry` (patient and non-patient entries merged,
+**Response**: paged list of `ProviderQueueEntry` under the standard `results` envelope (patient and non-patient entries merged,
 sorted by status, then priority high-to-low, then FIFO). Each entry carries:
 `uuid`, `queueNumber`, `displayName`, `identifiedBy`, `currentLocation`, `serviceLocation`,
 `status`, `priority`, `dateCreated`, `patient`, `sourceType` (`PATIENT_QUEUE` or null),
@@ -515,6 +633,15 @@ OpenMRS REST takes updates as **POST** to the resource's uuid (`PUT …/<uuid>` 
   needed when the uuid alone cannot disambiguate.
 
 **Requires**: `Task: patientqueueing.manageQueue`
+
+
+**Response**: the updated entry as ProviderQueueResource serializes it (the 15 fields the list
+above documents — uuid, queueNumber, displayName, identifiedBy, currentLocation, serviceLocation,
+status, priority, dateCreated, patient, sourceType, locationToUuid, queueRoomUuid, comment,
+action). The response carries no per-action timestamps; the effects of an action (the new status,
+the transferred row) are read from these fields, by a single-entry GET
+`/patientqueueing/providerqueuebylocation/{uuid}` (status-only effects), or by re-fetching the
+list after a FORWARD (the new row's uuid is only in the list).
 
 **Example**:
 ```bash
@@ -575,20 +702,22 @@ Unified representation of both patient and non-patient queues.
 | comment | string | Additional notes (optional) |
 | isPatientQueue | Boolean | True if patient queue |
 
-### CheckInResult
+### CheckInResult (POST /patientqueueing/checkin)
 
-Result of a check-in operation.
+Result of a generic check-in operation.
 
 | Field | Type | Description |
 |-------|------|-------------|
-| patient | Patient | Patient (for patient check-in) |
-| visit | Visit | Created visit (future) |
-| queueEntry | QueueEntry | Created queue entry |
+| uuid | string | Created queue entry UUID |
 | ticketNumber | string | Assigned ticket number |
-| estimatedWaitMinutes | Integer | Estimated wait time |
-| queuePosition | Integer | Position in queue |
+| status | string | Entry status (PENDING) |
+| dateCreated | Date | Creation timestamp |
+| queuePosition | Integer | Position in queue (1-based; count includes this entry) |
+| estimatedWaitMinutes | Integer | (queuePosition - 1) × estimatedWaitMinutesPerPerson |
 | success | Boolean | True if successful |
-| errorMessage | string | Error message if failed |
+| patient | object | `{uuid, display}` |
+| visit | object | `{uuid, startDatetime, visitType}` |
+| queueEntry | object | `{uuid, visitNumber, status, dateCreated, provider}` |
 
 ### NonPatientQueue
 
@@ -604,7 +733,7 @@ Non-patient queue entry.
 | currentLocation | Location | Current location |
 | locationTo | Location | Destination location |
 | queueRoom | Location | Queue room |
-| status | enum | WAITING, CALLED, ARRIVED, SERVING, COMPLETED, CANCELLED |
+| status | enum | WAITING, CALLED, ARRIVED, SERVING, COMPLETED, SKIPPED, CANCELLED, HOLD, NO_SHOW, TRANSFERRED |
 | priority | Integer | Priority level |
 | comment | string | Notes |
 | calledBy | Provider | Provider who called |
@@ -709,7 +838,7 @@ No rate limiting is currently enforced. Clients should implement reasonable poll
 
 ## Best Practices
 
-1. **Always handle errors**: Check the `success` field in CheckInResult
+1. **Always handle errors**: `/patientqueueing/checkin` carries a `success` field; the other resources surface errors as HTTP 400/404 with a message
 2. **Use polling for displays**: Don't poll more frequently than every 5 seconds
 3. **Filter by location**: Always provide location/queueRoom filters when possible
 4. **Use date ranges**: Specify dateFrom/dateTo for better performance
@@ -721,7 +850,10 @@ No rate limiting is currently enforced. Clients should implement reasonable poll
 
 ## Changelog
 
-### Version 2.0.2-SNAPSHOT
+### Version 3.0.0-SNAPSHOT (Current)
+
+The README's changelog is canonical; this release requires OpenMRS Platform 2.8.x and the
+privilege grants listed under Privileges & Roles there.
 - ✅ Added self check-in endpoints
 - ✅ Added unified queue display APIs
 - ✅ Added non-patient queue management
