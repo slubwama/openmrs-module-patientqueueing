@@ -21,7 +21,7 @@
 
 Generic patient check-in with configurable visit type. Supports provider auto-assignment, queue position calculation, and estimated wait time.
 
-**Endpoint**: `POST /ws/rest/v1/patientqueueing/checkin` — **Requires**: `Task: patientqueueing.sendPatientToQueue` and `Task: patientqueueing.viewQueue` (enforced at the service layer); creating the visit additionally needs `Get Visits`, `Get Visit Types`, `Get Visit Attribute Types` and `Add Visits` (the validator reads attribute types); auto-assignment additionally needs `Get Providers`; when `patientqueueing.providerLocationAttributeTypeUuid` is not set (or does not resolve), the fallback matches providers by user default location and additionally needs `Get Users` — if that privilege is missing (or no provider matches the location), the check-in still succeeds but the patient is queued unassigned
+**Endpoint**: `POST /ws/rest/v1/patientqueueing/checkin` — **Requires**: `Task: patientqueueing.sendPatientToQueue` and `Task: patientqueueing.viewQueue` (enforced at the service layer), plus `Get Patients`, `Get Visits` and `Get Visit Types`; creating a visit, when the patient has no open one, additionally needs `Get Visit Attribute Types` and `Add Visits` (the validator reads attribute types); auto-assignment, or a `provider` in the request, additionally needs `Get Providers`; when auto-assignment runs and `patientqueueing.providerLocationAttributeTypeUuid` is not set (or does not resolve), the fallback matches providers by user default location and additionally needs `Get Users` — if that privilege is missing (or no provider matches the location), the check-in still succeeds but the patient is queued unassigned
 
 **Parameters**:
 | Parameter | Type | Required | Description |
@@ -173,6 +173,7 @@ curl -X POST -H 'Content-Type: application/json' \
   -d '{
         "displayName": "Jane Smith",
         "phoneNumber": "+1234567890",
+        "queueType": "concept-uuid",
         "currentLocation": "b1e39c4d-1234-5678-9abc-def456789013",
         "locationTo": "b1e39c4d-1234-5678-9abc-def456789013",
         "queueRoom": "c1e39c4d-1234-5678-9abc-def456789014"
@@ -451,7 +452,7 @@ Get display data for public queue monitors, including "now serving" and "up next
     "upNextCount": 4,
     "totalCount": 5
   },
-      "lastUpdated": 1776768600000
+      "lastUpdated": "2026-04-21T10:50:00.000+0000"
     }
   ]
 }
@@ -527,7 +528,7 @@ curl -X GET \
 
 Same endpoint and request as [Non-Patient Check-in](#non-patient-check-in), which holds the
 full request/response documentation. **Requires**: `Task: patientqueueing.checkIn`; a
-`queueTypeUuid` additionally needs `Get Concepts`.
+`queueType` additionally needs `Get Concepts`.
 
 ### Update Non-Patient Queue
 
@@ -849,7 +850,7 @@ No rate limiting is currently enforced. Clients should implement reasonable poll
 
 ## Best Practices
 
-1. **Date formats differ by endpoint**: the raw create responses (`/checkin`, `/selfcheckin`) and `/display` entries serialize dates as epoch milliseconds; the kiosk lookups (`?ticketNumber=`, `?visitNumber=`) and the journey (`?journey=true`) format them as ISO 8601 strings
+1. **Date formats differ by endpoint**: the raw create responses (`/checkin`, `/selfcheckin`) and the `/display` row dates serialize as epoch milliseconds (`lastUpdated` on the display payload is an ISO string); the kiosk lookups (`?ticketNumber=`, `?visitNumber=`) and the journey (`?journey=true`) format dates as ISO 8601 strings
 2. **Always handle errors**: go by the HTTP status. `/checkin`, `/selfcheckin` and `/kiosk` answer the problems they check themselves (an unknown patient, location or identifier, or a missing required field) with HTTP 500 and the reason in `error.message`. `success` on `/checkin` is always `true`
 3. **Use polling for displays**: Don't poll more frequently than every 5 seconds
 4. **Filter by location**: Always provide location/queueRoom filters when possible
